@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const reportSchema = z.object({
-  fullName: z.string().trim().min(3, "Escribe el nombre completo.").max(140), alias: z.string().max(80).optional(), approximateAge: z.coerce.number().int().min(0).max(120).optional(), isMinor: z.boolean().default(false),
-  lastSeenDate: z.string().min(1, "Indica la fecha aproximada."), lastSeenTime: z.string().optional(), location: z.string().trim().min(3, "Indica un lugar aproximado.").max(240), clothing: z.string().max(800).optional(), features: z.string().max(800).optional(), circumstances: z.string().trim().min(10, "Cuéntanos brevemente qué ocurrió.").max(3000),
+  fullName: z.string().trim().min(3, "Escribe el nombre completo.").max(140), approximateAge: z.coerce.number().int().min(0).max(120).optional(),
+  lastSeenDate: z.string().min(1, "Indica la fecha aproximada."), lastSeenTime: z.string().optional(), location: z.string().trim().min(3, "Indica un lugar aproximado.").max(240), clothing: z.string().max(800).optional(), features: z.string().max(800).optional(),
   reporterName: z.string().trim().min(2, "Escribe tu nombre.").max(140), phone: z.string().trim().min(7, "Escribe un número de celular válido.").max(40).regex(/^[0-9+\s()-]+$/, "Escribe solo un número de celular válido."), consent: z.literal(true, { errorMap: () => ({ message: "Necesitamos tu consentimiento para procesar el reporte." }) }), goodFaith: z.literal(true, { errorMap: () => ({ message: "Confirma que la información es de buena fe." }) }), website: z.string().max(0).optional()
 });
 
