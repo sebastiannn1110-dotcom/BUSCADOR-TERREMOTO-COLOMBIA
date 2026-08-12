@@ -1,0 +1,42 @@
+{
+  "name": "encontrarnos",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "generate:avatars": "tsx scripts/generate-test-avatars.ts",
+    "promote:admin": "tsx scripts/promote-admin.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.49.4",
+    "next": "^15.2.4",
+    "openai": "^4.86.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.0",
+    "@playwright/test": "^1.51.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "eslint": "^9.22.0",
+    "eslint-config-next": "^15.2.4",
+    "jsdom": "^26.0.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

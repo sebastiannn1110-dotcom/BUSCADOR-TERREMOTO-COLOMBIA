@@ -1,0 +1,1 @@
+export default function Correction() { return <section className="legal"><h1>Solicitar corrección</h1><p>Desde la página de cada caso puedes enviar una corrección para revisión. No se realizan cambios automáticos con solicitudes públicas.</p></section>; }

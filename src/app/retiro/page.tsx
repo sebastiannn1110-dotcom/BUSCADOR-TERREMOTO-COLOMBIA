@@ -1,0 +1,1 @@
+export default function Removal() { return <section className="legal"><h1>Solicitar retiro de información</h1><p>Para solicitar el retiro de un caso o de información publicada, usa “Tengo información” en el caso correspondiente y selecciona “Quiero corregir un dato”, indicando que deseas el retiro. El equipo autorizado lo revisará de forma privada.</p></section>; }

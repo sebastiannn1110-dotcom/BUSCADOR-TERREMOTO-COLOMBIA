@@ -1,0 +1,3 @@
+import { expect, test } from "@playwright/test";
+test("busca y abre un caso de demostración", async ({ page }) => { await page.goto("/buscar?q=Valeria"); await expect(page.getByText("Valeria Montes Ríos")).toBeVisible(); await page.getByRole("link", { name: /Ver caso de Valeria/ }).click(); await expect(page.getByRole("heading", { name: "Valeria Montes Ríos" })).toBeVisible(); });
+test("la navegación funciona en móvil", async ({ page }) => { await page.setViewportSize({ width: 320, height: 700 }); await page.goto("/"); await expect(page.getByRole("heading", { name: "Encuentra a tu familiar" })).toBeVisible(); });
