@@ -9,6 +9,7 @@ Plataforma móvil, privada por defecto, para publicar y buscar casos humanitario
 3. En Supabase SQL Editor ejecute `supabase/migrations/202608120001_initial.sql`.
 4. Cree buckets privados para evidencia y uno público solo para retratos revisados; aplique políticas de Storage que permitan únicamente a moderadores escribir y publicar paths aprobados.
 5. Para la demo local, defina `ENABLE_TEST_DATA=true`, ejecute `npm run generate:avatars` y siembra `supabase/seed.sql` en una sesión con `set app.enable_test_data = 'true';`.
+   Después ejecute `npm run verify:supabase`; debe indicar exactamente 15 casos de prueba.
 6. Ejecute `npm run dev`. La salud está en `/api/health`.
 
 ## Moderación y administrador
