@@ -4,8 +4,10 @@ const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 if (!url || !key) throw new Error("Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
 
-const response = await fetch(`${url}/rest/v1/public_case_cards?select=id,full_name,is_test_data&limit=20`, {
-  headers: { apikey: key, Authorization: `Bearer ${key}` }
+const response = await fetch(`${url}/rest/v1/rpc/search_public_people`, {
+  method: "POST",
+  headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ query_text: "", status_filter: null, min_age: null, max_age: null, page_limit: 20, page_offset: 0 })
 });
 if (!response.ok) {
   const detail = await response.json().catch(() => ({}));
