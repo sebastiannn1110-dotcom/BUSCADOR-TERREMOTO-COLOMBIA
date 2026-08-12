@@ -19,5 +19,6 @@
 
 .footer-emergency { margin-top: 22px; max-width: 850px; background: #f9f0d8; border-left: 5px solid #b77a12; padding: 14px 16px; color: #17202a; font-size: 1rem; }
 .footer-emergency p { margin: 3px 0; }
-.colombia-flag { width: 30px; height: 20px; flex: 0 0 auto; margin-left: auto; border: 1px solid #59656b; border-radius: 2px; background: linear-gradient(to bottom, #fcd116 0 50%, #003893 50% 75%, #ce1126 75% 100%); box-shadow: 0 1px 2px #0003; }
+.colombia-flag { width: 30px; height: 20px; flex: 0 0 auto; border: 1px solid #59656b; border-radius: 2px; background: linear-gradient(to bottom, #fcd116 0 50%, #003893 50% 75%, #ce1126 75% 100%); box-shadow: 0 1px 2px #0003; }
+.brand-flag { display: inline-block; margin-right: 8px; vertical-align: -3px; }
 @media (max-width: 480px) { .colombia-flag { width: 26px; height: 18px; } }
