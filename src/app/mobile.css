@@ -1,0 +1,21 @@
+@media (max-width: 480px) {
+  main { padding: 16px 12px 36px; }
+  .site-header { padding: 8px 12px; align-items: flex-start; }
+  .site-header nav { gap: 5px; justify-content: flex-end; }
+  .site-header nav a { font-size: .84rem; padding: 8px 1px; }
+  .brand { font-size: 1.1rem; }
+  .hero { margin: 18px auto 32px; text-align: left; }
+  .hero .search-box { margin: 0; }
+  .hero .text-button { min-height: 44px; display: flex; align-items: center; }
+  .action-grid,.case-grid { gap: 12px; }
+  .action { min-height: 104px; padding: 17px; }
+  .portrait { height: min(122vw, 380px); }
+  .detail-photo { max-width: 100%; height: 320px; }
+  .report-form { padding: 15px; gap: 14px; }
+  .form-actions { position: sticky; bottom: 0; background: #fff; padding-top: 10px; }
+  footer { padding: 22px 12px; }
+  .footer-emergency { margin: 22px -12px -22px; border-top: 5px solid #b77a12; padding: 16px 12px; background: #f9f0d8; color: #17202a; }
+}
+
+.footer-emergency { margin-top: 22px; max-width: 850px; background: #f9f0d8; border-left: 5px solid #b77a12; padding: 14px 16px; color: #17202a; font-size: 1rem; }
+.footer-emergency p { margin: 3px 0; }
