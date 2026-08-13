@@ -17,9 +17,8 @@ export default function ReportPage() {
   const progressRef = useRef<HTMLParagraphElement>(null);
   const previousStep = useRef(step);
   const captchaSiteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY || "";
-  const captchaRequired = process.env.NODE_ENV === "production";
-  const captchaUnavailable = captchaRequired && !captchaSiteKey;
-  const captchaPending = captchaRequired && Boolean(captchaSiteKey) && !captchaToken;
+  const captchaEnabled = Boolean(captchaSiteKey);
+  const captchaPending = captchaEnabled && !captchaToken;
   const onCaptchaError = useCallback(() => {
     setCaptchaToken("");
     setCaptchaError("No se pudo completar la verificación. Recarga la página e inténtalo de nuevo.");
@@ -61,7 +60,7 @@ export default function ReportPage() {
     setError("");
 
     try {
-      if (captchaRequired && !captchaToken) {
+      if (captchaEnabled && !captchaToken) {
         setError("Completa la verificación de seguridad antes de enviar el reporte.");
         return;
       }
@@ -114,14 +113,14 @@ export default function ReportPage() {
         <p id="phone-help" className="privacy-note">Usaremos este número solamente para revisar el reporte o pedir información adicional.</p>
       </fieldset>}
       {error && <p role="alert" className="form-error">{error}</p>}
-      {step === 3 && captchaRequired && <>
-        {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} onError={onCaptchaError} /> : <p id="captcha-submit-help" className="form-error" role="status">El envío seguro no está disponible en este momento. Inténtalo más tarde.</p>}
+      {step === 3 && captchaEnabled && <>
+        <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} onError={onCaptchaError} />
         {captchaPending && <p id="captcha-submit-help" className="hint" role="status">Completa la verificación de seguridad para habilitar el envío.</p>}
         {captchaError && <p className="form-error" role="alert">{captchaError}</p>}
       </>}
       <div className="form-actions">
         {step > 1 && <button type="button" className="button secondary" onClick={(event) => goBack(event.currentTarget.form)}>Atrás</button>}
-        <button className="button" type="submit" disabled={busy || (step === 3 && (captchaUnavailable || captchaPending))} aria-describedby={step === 3 && (captchaUnavailable || captchaPending) ? "captcha-submit-help" : undefined}>{step === 3 ? (busy ? "Enviando…" : "Enviar reporte") : "Continuar"}</button>
+        <button className="button" type="submit" disabled={busy || (step === 3 && captchaPending)} aria-describedby={step === 3 && captchaPending ? "captcha-submit-help" : undefined}>{step === 3 ? (busy ? "Enviando…" : "Enviar reporte") : "Continuar"}</button>
       </div>
     </form>
   </section>;

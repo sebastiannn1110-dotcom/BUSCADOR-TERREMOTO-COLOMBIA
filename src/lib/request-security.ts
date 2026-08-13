@@ -5,7 +5,10 @@ import { createHash } from "node:crypto";
  * Raw IP addresses are never persisted or returned to the client.
  */
 export function requestFingerprint(request: Request) {
-  const secret = process.env.IP_HASH_SECRET;
+  // Prefer a separately rotated key. The server-only Supabase key is a safe
+  // fallback so reports keep their abuse protection when that optional key has
+  // not yet been configured in a deployment.
+  const secret = process.env.IP_HASH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret && process.env.NODE_ENV === "production") return null;
 
   const forwarded = request.headers.get("cf-connecting-ip")

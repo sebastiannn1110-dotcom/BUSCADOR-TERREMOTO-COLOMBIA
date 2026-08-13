@@ -61,6 +61,15 @@ describe("POST /api/reports", () => {
     });
   });
 
+  it("permite el envío con las protecciones de servidor cuando CAPTCHA no está configurado", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-SIN-CAPTCHA" }, error: null });
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "server-only-test-key");
+    const response = await post(missingPerson);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ trackingCode: "EN-SIN-CAPTCHA" });
+  });
+
   it("informa el límite de envíos sin revelar datos internos", async () => {
     rpc.mockResolvedValue({ data: null, error: { code: "P0001" } });
     const response = await post(missingPerson);

@@ -20,9 +20,8 @@ export function InformationForm({ caseId }: { caseId: string }) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState("");
   const captchaSiteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY || "";
-  const captchaRequired = process.env.NODE_ENV === "production";
-  const captchaUnavailable = captchaRequired && !captchaSiteKey;
-  const captchaPending = captchaRequired && Boolean(captchaSiteKey) && !captchaToken;
+  const captchaEnabled = Boolean(captchaSiteKey);
+  const captchaPending = captchaEnabled && !captchaToken;
   const onCaptchaError = useCallback(() => {
     setCaptchaToken("");
     setCaptchaError("No se pudo completar la verificación. Recarga la página e inténtalo de nuevo.");
@@ -36,7 +35,7 @@ export function InformationForm({ caseId }: { caseId: string }) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    if (captchaRequired && !captchaToken) {
+    if (captchaEnabled && !captchaToken) {
       setError("Completa la verificación de seguridad antes de enviar la información.");
       return;
     }
@@ -86,12 +85,12 @@ export function InformationForm({ caseId }: { caseId: string }) {
     <label>Lugar aproximado<input name="location" maxLength={240} autoCapitalize="words" /></label>
     <label>Descripción<textarea name="description" required minLength={10} maxLength={3000} /></label>
     <label className="check"><input name="consent" type="checkbox" required /> Autorizo el tratamiento de esta información para su revisión.</label>
-    {captchaRequired && <>
-      {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} onError={onCaptchaError} /> : <p id="captcha-submit-help" className="form-error" role="status">El envío seguro no está disponible en este momento. Inténtalo más tarde.</p>}
+    {captchaEnabled && <>
+      <Turnstile siteKey={captchaSiteKey} onToken={onCaptchaToken} onError={onCaptchaError} />
       {captchaPending && <p id="captcha-submit-help" className="hint" role="status">Completa la verificación de seguridad para habilitar el envío.</p>}
       {captchaError && <p className="form-error" role="alert">{captchaError}</p>}
     </>}
     {error && <p role="alert" className="form-error">{error}</p>}
-    <button className="button" type="submit" disabled={busy || captchaUnavailable || captchaPending} aria-describedby={captchaUnavailable || captchaPending ? "captcha-submit-help" : undefined}>{busy ? "Enviando…" : "Enviar información"}</button>
+    <button className="button" type="submit" disabled={busy || captchaPending} aria-describedby={captchaPending ? "captcha-submit-help" : undefined}>{busy ? "Enviando…" : "Enviar información"}</button>
   </form>;
 }
