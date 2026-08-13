@@ -12,6 +12,8 @@ vi.mock("@/components/admin-logout", () => ({ AdminLogout: () => <span /> }));
 vi.mock("@/components/contact-followups-queue", () => ({ ContactFollowupsQueue: () => <span /> }));
 vi.mock("@/components/official-deceased-importer", () => ({ OfficialDeceasedImporter: () => <span /> }));
 vi.mock("@/components/pending-people-queue", () => ({ PendingPeopleQueue: () => <span /> }));
+vi.mock("@/components/admin-people-manager", () => ({ AdminPeopleManager: () => <span /> }));
+vi.mock("@/components/case-message-inbox", () => ({ CaseMessageInbox: () => <span /> }));
 vi.mock("@/components/sightings-queue", () => ({ SightingsQueue: () => <span /> }));
 
 import AdminPage from "@/app/admin/page";
@@ -39,7 +41,7 @@ const protectedPages: ProtectedPage[] = [
   {
     name: "personas pendientes",
     loginPath: "/admin/login?next=/admin/personas-pendientes",
-    render: () => PendingPeoplePage(),
+    render: () => PendingPeoplePage({ searchParams: Promise.resolve({}) }),
     requirement: "el rol de moderador o administrador",
     requiredRole: "moderator_or_admin"
   },

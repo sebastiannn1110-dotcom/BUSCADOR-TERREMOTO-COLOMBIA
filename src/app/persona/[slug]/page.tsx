@@ -5,6 +5,7 @@ import { PhotoPlaceholder } from "@/components/photo-placeholder";
 import { StatusBadge, VerificationBadge } from "@/components/status-badge";
 import { getCase } from "@/lib/cases";
 import { formatDate } from "@/lib/status";
+import { publicCasePath } from "@/lib/public-case-route";
 
 export default async function PersonPage({ params }: { params: Promise<{ slug: string }> }) {
   const item = await getCase((await params).slug);
@@ -14,6 +15,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
   const showTestLabel = process.env.NODE_ENV !== "production" && item.is_test_data;
   const deceased = item.condition_status === "deceased_confirmed";
   const medicinaLegal = item.public_source_label?.trim().toLocaleLowerCase("es") === "medicina legal";
+  const casePath = publicCasePath(item.slug);
 
   return <article className="case-detail">
     {showTestLabel && <p className="test-label">DATOS DE PRUEBA — Personas, imágenes y situaciones ficticias.</p>}
@@ -34,7 +36,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
         {item.public_description && <p className="lead">{item.public_description}</p>}
         <Link
           className="button detail-primary-action"
-          href={`/persona/${item.slug}/informacion${deceased ? "?tipo=correction" : ""}`}
+          href={`${casePath}/informacion${deceased ? "?tipo=correction" : ""}`}
         >{deceased ? "Tengo una corrección o información" : "Tengo información / La vi"}</Link>
       </div>
     </div>
@@ -73,10 +75,10 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
     {!deceased && <section id="informacion" className="information-cta">
       <h2>¿Tienes información?</h2>
       <p>Tu información quedará privada hasta que el equipo la revise. Nunca cambia el estado del caso automáticamente.</p>
-      <Link className="button" href={`/persona/${item.slug}/informacion`}>Tengo información / La vi</Link>
+      <Link className="button" href={`${casePath}/informacion`}>Tengo información / La vi</Link>
     </section>}
     <aside className="request-links">
-      <Link href={`/persona/${item.slug}/informacion?tipo=correction`}>{deceased ? "Tengo una corrección o información" : "Solicitar corrección"}</Link>
+      <Link href={`${casePath}/informacion?tipo=correction`}>{deceased ? "Tengo una corrección o información" : "Solicitar corrección"}</Link>
       <Link href="/retiro">Solicitar retiro</Link>
     </aside>
   </article>;

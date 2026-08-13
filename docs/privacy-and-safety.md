@@ -30,7 +30,9 @@ Los campos públicos rechazan patrones obvios de teléfono y correo tanto en la 
 
 ## Contacto mediado
 
-No existe contacto público directo entre familiares e informantes. El equipo autorizado actúa como intermediario desde `/admin/seguimiento-contactos`. Cada gestión guarda un resumen privado, método, estado y próxima fecha opcional en `contact_followups`; el historial es append-only y cada alta se audita. La plataforma no envía WhatsApp, SMS ni correo automáticamente.
+No existe contacto público directo entre familiares e informantes. El equipo autorizado actúa como intermediario desde `/admin/seguimiento-contactos` o la sección `Mensajes y seguimiento` de `/admin/personas-pendientes`. La bandeja agrupa por caso los mensajes recibidos desde los formularios públicos y las notas internas. Cada gestión guarda un resumen privado, método, estado y próxima fecha opcional en `contact_followups`; el historial es append-only y cada alta se audita. La plataforma no envía WhatsApp, SMS ni correo automáticamente ni comparte contactos entre usuarios.
+
+Retirar una persona publicada no ejecuta un borrado físico: `withdraw_person_case` cambia el caso a `archived`, establece su marca de retiro y lo excluye inmediatamente de la proyección pública. Solo un `admin` puede hacerlo, debe indicar una razón y se crean registros en moderación y auditoría.
 
 ## Evidencia y retratos
 
@@ -72,4 +74,4 @@ Los reportes de posible atrapamiento o posible fallecimiento exigen contacto y s
 
 ## Responsabilidades operativas pendientes
 
-Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las seis migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.
+Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las siete migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.

@@ -32,6 +32,8 @@ declare
   v_failed boolean;
   v_count integer;
   v_count_before integer;
+  v_withdraw_case_id uuid;
+  v_withdraw_person_id uuid;
 begin
   insert into auth.users (id, email, created_at, updated_at)
   values
@@ -1685,7 +1687,10 @@ begin
     or has_function_privilege('anon', 'public.get_contact_followup_queue()', 'EXECUTE')
     or has_function_privilege('anon', 'public.get_staff_media_asset(uuid)', 'EXECUTE')
     or has_function_privilege('anon', 'public.review_pending_person_case(uuid,text,text,text,text,uuid,text,text)', 'EXECUTE')
-    or has_function_privilege('anon', 'public.log_contact_followup(uuid,uuid,uuid,text,text,text,text,timestamp with time zone)', 'EXECUTE') then
+    or has_function_privilege('anon', 'public.log_contact_followup(uuid,uuid,uuid,text,text,text,text,timestamp with time zone)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.get_admin_people_cases(text,integer,integer)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.withdraw_person_case(uuid,text)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.get_admin_case_message_threads(integer)', 'EXECUTE') then
     raise exception 'Anon can execute a staff-only RPC';
   end if;
   if has_function_privilege(
@@ -1722,6 +1727,77 @@ begin
   ) then
     raise exception 'contact_followups RLS policies are incomplete';
   end if;
+  -- A published card can be withdrawn only by an administrator. The operation
+  -- preserves rows and creates both moderation and audit evidence. The private
+  -- inbox groups public submissions with their internal follow-up history.
+  insert into public.people (full_name, normalized_name, approximate_age, is_test_data)
+  values ('Persona Ficticia Para Retiro', 'persona ficticia para retiro', 52, false)
+  returning id into v_withdraw_person_id;
+  insert into public.cases (
+    person_id, slug, publication_status, condition_status, verification_level,
+    last_seen_location_public, published_at, created_by, reviewed_by
+  ) values (
+    v_withdraw_person_id, 'persona ficticia para retiro-con-espacios', 'published',
+    'missing', 'moderator_reviewed', 'Sector ficticio', now(), v_admin, v_admin
+  ) returning id into v_withdraw_case_id;
+  insert into public.case_reports (case_id, report_type, description, tracking_code)
+  values (v_withdraw_case_id, 'correction', 'Mensaje ficticio recibido desde la web.', 'EN-RETIRO-FICTICIO')
+  returning id into v_report_id;
+  insert into public.reporter_contacts (report_id, reporter_name, phone, preferred_contact_method)
+  values (v_report_id, 'Informante Ficticio', '3000000000', 'llamada')
+  returning id into v_contact_id;
+
+  perform set_config('request.jwt.claim.sub', v_moderator::text, true);
+  v_result := public.get_admin_people_cases('Persona Ficticia Para Retiro', 20, 0);
+  if jsonb_array_length(v_result) <> 1
+    or v_result #>> '{0,publicationStatus}' <> 'published'
+    or v_result #>> '{0,fullName}' <> 'Persona Ficticia Para Retiro' then
+    raise exception 'Admin people manager did not return the published fictitious case';
+  end if;
+  v_result := public.get_admin_case_message_threads(100);
+  if not (v_result @> jsonb_build_array(jsonb_build_object(
+    'caseId', v_withdraw_case_id,
+    'messages', jsonb_build_array(jsonb_build_object(
+      'reportId', v_report_id,
+      'descriptionPrivate', 'Mensaje ficticio recibido desde la web.',
+      'phone', '3000000000'
+    ))
+  ))) then
+    raise exception 'Private case-message inbox did not group the incoming message';
+  end if;
+  v_failed := false;
+  begin
+    perform public.withdraw_person_case(v_withdraw_case_id, 'Intento ficticio de moderador');
+  exception when sqlstate '42501' then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'Moderator withdrew a published person case';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_result := public.withdraw_person_case(
+    v_withdraw_case_id,
+    'Retiro ficticio solicitado y verificado por administración'
+  );
+  if coalesce((v_result ->> 'withdrawn')::boolean, false) is not true
+    or exists (select 1 from public.public_case_cards where id = v_withdraw_case_id)
+    or not exists (
+      select 1 from public.cases
+      where id = v_withdraw_case_id and publication_status = 'archived' and deleted_at is not null
+    )
+    or not exists (
+      select 1 from public.moderation_actions
+      where case_id = v_withdraw_case_id and action = 'archive'
+        and metadata ->> 'operation' = 'withdraw_published_case'
+    )
+    or not exists (
+      select 1 from public.audit_logs
+      where entity_id = v_withdraw_case_id and action = 'published_person_case_withdrawn'
+    ) then
+    raise exception 'Audited published-person withdrawal did not preserve its contract';
+  end if;
+
   if exists (
     select 1 from pg_policies
     where schemaname = 'public'
@@ -1786,8 +1862,8 @@ begin
   end if;
 
   v_result := public.reports_debug_snapshot();
-  if v_result ->> 'schemaVersion' <> '202608130002'
-    or v_result ->> 'lastMigrationApplied' <> '202608130002'
+  if v_result ->> 'schemaVersion' <> '202608130003'
+    or v_result ->> 'lastMigrationApplied' <> '202608130003'
     or coalesce((v_result ->> 'deceasedFilterReady')::boolean, false) is not true
     or (v_result #>> '{publishedCounts,missing}')::bigint <> (
       select count(*)
@@ -1823,6 +1899,15 @@ begin
     )))
     or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
       'name', 'manage_staff_profile', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'get_admin_people_cases', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'withdraw_person_case', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'get_admin_case_message_threads', 'found', true
     )))
     or not (v_result -> 'buckets' @> jsonb_build_array(jsonb_build_object(
       'name', 'report-evidence'

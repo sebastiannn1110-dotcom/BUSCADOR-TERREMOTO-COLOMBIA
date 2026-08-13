@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PhotoPlaceholder } from "@/components/photo-placeholder";
 import { formatDate } from "@/lib/status";
+import { publicCasePath } from "@/lib/public-case-route";
 import type { CaseCard as CaseCardType } from "@/lib/types";
 import { StatusBadge, VerificationBadge } from "./status-badge";
 
@@ -11,9 +12,10 @@ export function CaseCard({ item }: { item: CaseCardType }) {
   const reportedPlace = item.reported_unit || item.last_seen_location_public;
   const sightingCount = item.approved_sightings_count ?? item.approved_reports_count;
   const showTestLabel = process.env.NODE_ENV !== "production" && item.is_test_data;
+  const casePath = publicCasePath(item.slug);
 
   return <article className={`case-card${deceased ? " deceased-card" : ""}`}>
-    <Link href={`/persona/${item.slug}`} className="card-link" aria-label={`Ver caso de ${item.full_name}`}>
+    <Link href={casePath} className="card-link" aria-label={`Ver caso de ${item.full_name}`}>
       <div className="portrait">
         {item.primary_public_photo_url
           ? <Image src={item.primary_public_photo_url} alt={`Foto publicada de ${item.full_name}`} fill sizes="(max-width: 700px) 100vw, 33vw" />
@@ -48,8 +50,8 @@ export function CaseCard({ item }: { item: CaseCardType }) {
       </div>
     </Link>
     <div className="card-actions">
-      <Link className={deceased ? "button" : "button secondary"} href={`/persona/${item.slug}`}>Ver caso</Link>
-      <Link className={deceased ? "button secondary" : "button"} href={`/persona/${item.slug}/informacion${deceased ? "?tipo=correction" : ""}`}>
+      <Link className={deceased ? "button" : "button secondary"} href={casePath}>Ver caso</Link>
+      <Link className={deceased ? "button secondary" : "button"} href={`${casePath}/informacion${deceased ? "?tipo=correction" : ""}`}>
         {deceased ? "Tengo una corrección o información" : "Tengo información / La vi"}
       </Link>
     </div>

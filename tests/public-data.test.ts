@@ -4,7 +4,8 @@ import { NextRequest } from "next/server";
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ publicSupabase: () => ({ rpc }) }));
 
-import { sanitizePublicCase, searchCases } from "@/lib/cases";
+import { getCase, sanitizePublicCase, searchCases } from "@/lib/cases";
+import { publicCasePath } from "@/lib/public-case-route";
 import { GET } from "@/app/api/search/route";
 
 const databaseRow = {
@@ -89,6 +90,18 @@ describe("proyección pública defensiva", () => {
     const result = await searchCases("Persona", { status: "missing" });
     expect(result).toHaveLength(1);
     expect(rpc).toHaveBeenCalledWith("search_public_people", expect.objectContaining({ status_filter: "missing" }));
+  });
+
+  it("decodifica slugs oficiales con espacios antes de consultar la ficha", async () => {
+    rpc.mockResolvedValue({ data: [{ ...databaseRow, slug: "fernando alonso gonzalez-db2b9d84ba3e" }], error: null });
+
+    const result = await getCase("fernando%20alonso%20gonzalez-db2b9d84ba3e");
+
+    expect(result?.slug).toBe("fernando alonso gonzalez-db2b9d84ba3e");
+    expect(rpc).toHaveBeenCalledWith("get_public_case", {
+      case_slug: "fernando alonso gonzalez-db2b9d84ba3e"
+    });
+    expect(publicCasePath(result!.slug)).toBe("/persona/fernando%20alonso%20gonzalez-db2b9d84ba3e");
   });
 
   it("la API soporta estado y devuelve únicamente la lista segura", async () => {

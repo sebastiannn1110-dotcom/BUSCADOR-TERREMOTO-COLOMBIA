@@ -26,7 +26,7 @@ Las páginas públicas solo consultan el contrato permitido: `public_case_cards`
 | --- | --- | --- |
 | `/admin/login` | Sin sesión | Inicio de sesión con Supabase Auth. |
 | `/admin` | `admin`, `moderator`, `responder` | Panel adaptado a las capacidades del rol. |
-| `/admin/personas-pendientes` | `admin`, `moderator` | Revisar, publicar, rechazar, deduplicar, archivar o pedir información sobre nuevos casos. |
+| `/admin/personas-pendientes` | `admin`, `moderator` | Revisar nuevos casos, gestionar personas publicadas y consultar mensajes/seguimiento agrupados por caso. El retiro de una card publicada es exclusivo de `admin`. |
 | `/admin/avistamientos` | Lectura: todos; acciones: `admin`, `moderator` | Cola de reportes pendientes/escalados y moderación de avistamientos. |
 | `/admin/posibles-avistamientos` | Igual que `/admin/avistamientos` | Alias que redirige a la cola canónica. |
 | `/admin/seguimiento-contactos` | Lectura: todos; escritura: `admin`, `moderator` | Contactos privados y seguimientos append-only. |
@@ -45,6 +45,8 @@ Las páginas públicas solo consultan el contrato permitido: `public_case_cards`
 | `/api/reports` | `POST` | Nuevos casos e información privada. |
 | `/api/debug/reports` | `GET` | Diagnóstico temporal protegido por `x-debug-token`: esquema/RLS/RPCs/buckets, última migración, conteos públicos agregados y preparación del filtro de fallecidos. |
 | `/api/admin/pending-people` | `GET`, `POST` | Cola y revisión de personas pendientes. |
+| `/api/admin/people` | `GET`, `POST` | Listado administrativo y retiro lógico auditado de cards publicadas. |
+| `/api/admin/case-messages` | `GET` | Bandeja privada de mensajes web e historial de seguimiento agrupado por caso. |
 | `/api/admin/sightings` | `GET`, `POST` | Cola y moderación de reportes. |
 | `/api/admin/contact-followups` | `GET`, `POST` | Cola y altas append-only de seguimiento. |
 | `/api/admin/private-media/[assetId]` | `GET` | Acceso autenticado y auditado a evidencia privada. |

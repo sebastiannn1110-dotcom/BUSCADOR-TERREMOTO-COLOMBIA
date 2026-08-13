@@ -15,6 +15,8 @@ import { POST as moderate } from "@/app/api/admin/sightings/route";
 import { GET as getPendingPeople, POST as reviewPendingPerson } from "@/app/api/admin/pending-people/route";
 import { GET as getPrivateMedia } from "@/app/api/admin/private-media/[assetId]/route";
 import { GET as getContactFollowups, POST as logContactFollowup } from "@/app/api/admin/contact-followups/route";
+import { GET as getManagedPeople, POST as withdrawPerson } from "@/app/api/admin/people/route";
+import { GET as getCaseMessages } from "@/app/api/admin/case-messages/route";
 import { POST as importDeceased } from "@/app/api/admin/import-deceased/route";
 
 const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -309,6 +311,63 @@ describe("rutas administrativas", () => {
     const response = await getContactFollowups();
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("get_contact_followup_queue");
+  });
+
+  it("lista personas administradas sin exponer la consulta fuera del RPC", async () => {
+    authenticated();
+    rpc.mockResolvedValue({ data: [{ caseId, fullName: "Persona administrada" }], error: null });
+
+    const response = await getManagedPeople(new NextRequest("http://localhost/api/admin/people?q=Persona"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(rpc).toHaveBeenCalledWith("get_admin_people_cases", {
+      p_query: "Persona",
+      p_limit: 200,
+      p_offset: 0
+    });
+    expect((await response.json()).people).toHaveLength(1);
+  });
+
+  it("retira una persona publicada solo mediante el RPC administrativo auditado", async () => {
+    authenticated(admin);
+    rpc.mockResolvedValue({ data: { caseId, withdrawn: true, publicationStatus: "archived" }, error: null });
+
+    const response = await withdrawPerson(new NextRequest("http://localhost/api/admin/people", {
+      method: "POST",
+      body: JSON.stringify({ caseId, reason: "Retiro solicitado y verificado" })
+    }));
+
+    expect(response.status).toBe(200);
+    expect(getStaffContext).toHaveBeenCalledWith("admin");
+    expect(rpc).toHaveBeenCalledWith("withdraw_person_case", {
+      p_case_id: caseId,
+      p_reason: "Retiro solicitado y verificado"
+    });
+  });
+
+  it("impide que un moderador retire una persona publicada", async () => {
+    getStaffContext.mockResolvedValue({ db: { rpc }, staff: null, authenticated: true });
+
+    const response = await withdrawPerson(new NextRequest("http://localhost/api/admin/people", {
+      method: "POST",
+      body: JSON.stringify({ caseId, reason: "Intento no autorizado" })
+    }));
+
+    expect(response.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("carga la bandeja privada de mensajes agrupada por caso", async () => {
+    authenticated(admin);
+    rpc.mockResolvedValue({ data: [{ caseId, personName: "Persona con mensajes" }], error: null });
+
+    const response = await getCaseMessages();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(rpc).toHaveBeenCalledWith("get_admin_case_message_threads", { p_limit: 100 });
+    expect((await response.json()).threads).toHaveLength(1);
   });
 
   it("bloquea la importación oficial para un usuario no administrador", async () => {

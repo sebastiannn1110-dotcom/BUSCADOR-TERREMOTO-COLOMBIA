@@ -69,6 +69,12 @@ Las acciones escriben `moderation_actions` y `audit_logs`.
 
 Cada entrada contiene objetivo, método, estado, resumen privado y próxima fecha opcional. El historial no se edita ni borra; toda corrección debe ser una nueva entrada que explique la anterior. La plataforma registra la gestión, pero no envía mensajes automáticamente.
 
+La sección `Mensajes y seguimiento` de `/admin/personas-pendientes` presenta el mismo principio como una conversación privada por caso: mensajes entrantes de la web, contactos autorizados y notas append-only. Para conectar a familiares e informantes, el equipo debe obtener consentimiento de ambas partes y nunca copiar sus datos a campos públicos.
+
+## Retiro de una persona publicada
+
+En `Gestionar publicadas`, un administrador puede retirar una card y su ficha del buscador. Debe buscar el caso, escribir una razón y confirmar expresamente la acción. El RPC `withdraw_person_case` archiva el caso y lo marca como retirado; conserva persona, reportes, contactos, historial y evidencia para trazabilidad. La acción registra `moderation_actions` y `audit_logs`. Moderadores pueden consultar el listado, pero no ejecutar el retiro.
+
 ## Fallecimientos oficiales
 
 Solo `admin` usa `/admin/importar-fallecidos`. La fuente aceptada en el MVP es Medicina Legal. `source_reference` y justificación son obligatorias. Preview y confirmación vuelven a validar rol, datos y duplicados; el RPC establece `deceased_confirmed` únicamente junto con `authority_confirmed` y auditoría.

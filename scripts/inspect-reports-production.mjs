@@ -5,7 +5,7 @@
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-export const EXPECTED_SCHEMA_VERSION = "202608130002";
+export const EXPECTED_SCHEMA_VERSION = "202608130003";
 
 export const requiredEnvironment = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -62,7 +62,13 @@ export const expectedServiceRoleVisibleRpcs = [
 
 // These functions are checked through the service-only diagnostics snapshot,
 // not by assuming service_role can execute the authenticated-admin function.
-const expectedSnapshotRpcs = ["bootstrap_initial_admin", "manage_staff_profile"];
+const expectedSnapshotRpcs = [
+  "bootstrap_initial_admin",
+  "manage_staff_profile",
+  "get_admin_people_cases",
+  "withdraw_person_case",
+  "get_admin_case_message_threads"
+];
 
 // reports_debug_snapshot exposes RLS metadata for these physical tables. The
 // public_case_cards relation is a view and is validated separately by OpenAPI.

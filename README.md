@@ -12,7 +12,7 @@ No mezcles personas ficticias con producción. Los datos de prueba solo pueden s
 
 1. Instala Node.js 20.9 o superior y ejecuta `npm install`.
 2. Copia `.env.example` a `.env.local` y completa las variables necesarias.
-3. Aplica en Supabase, en orden, las seis migraciones:
+3. Aplica en Supabase, en orden, las siete migraciones:
 
    - `supabase/migrations/202608120001_initial.sql`
    - `supabase/migrations/202608120002_harden_public_report_submission.sql`
@@ -20,6 +20,7 @@ No mezcles personas ficticias con producción. Los datos de prueba solo pueden s
    - `supabase/migrations/202608120004_public_flows_and_official_imports.sql`
    - `supabase/migrations/202608130001_production_review_and_contact_followups.sql`
    - `supabase/migrations/202608130002_official_deceased_capture_and_diagnostics.sql`
+   - `supabase/migrations/202608130003_admin_case_withdrawal_and_message_threads.sql`
 
 4. Verifica los buckets `report-evidence` —privado— y `public-portraits` —público y reservado a retratos aprobados—.
 5. Ejecuta `npm run dev`.
@@ -34,7 +35,7 @@ Las migraciones más recientes añaden el flujo de personas pendientes, seguimie
 - Reportar una persona: `/reportar-desaparecido` (`/reportar` redirige allí).
 - Enviar información: `/persona/[slug]/informacion`.
 - Ver confirmación pública genérica del envío: `/reporte/confirmacion`; la pantalla no muestra el código, no genera enlaces para compartir y usa `noindex, nofollow`. La ruta heredada `/reporte/confirmacion/[trackingCode]` solo valida el formato y redirige a la URL genérica.
-- Revisar personas pendientes: `/admin/personas-pendientes`.
+- Revisar personas pendientes, gestionar cards publicadas y abrir la bandeja privada de mensajes por caso: `/admin/personas-pendientes`.
 - Moderar información: `/admin/avistamientos` (`/admin/posibles-avistamientos` es un alias).
 - Registrar seguimiento privado: `/admin/seguimiento-contactos`.
 - Importar fallecidos de Medicina Legal: `/admin/importar-fallecidos`, solo `admin`.
@@ -101,7 +102,7 @@ Las tres variables CAPTCHA se configuran juntas únicamente si Turnstile está h
 
 ## Datos ficticios: solo demo
 
-Con las seis migraciones aplicadas en un proyecto separado de demo y `ENABLE_TEST_DATA=true`:
+Con las siete migraciones aplicadas en un proyecto separado de demo y `ENABLE_TEST_DATA=true`:
 
 - Ejecuta `supabase/seed.sql` después de `set app.enable_test_data = 'true';`, o
 - define `DEMO_SEED_CONFIRMATION=seed-15-fictional-cases` y ejecuta `npm run seed:demo`.
@@ -120,6 +121,6 @@ npm run test:e2e
 
 ## Render
 
-Usa un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Aplica y verifica las seis migraciones antes del despliegue; luego valida `/api/health`, `/api/debug/reports`, los RPC, ambos buckets y los flujos con roles reales. Aplicar la migración, desplegar el commit e importar el CSV son tres acciones independientes: esta documentación no afirma que alguna ya se haya ejecutado en producción. No cargues datos ficticios en producción.
+Usa un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Aplica y verifica las siete migraciones antes del despliegue; luego valida `/api/health`, `/api/debug/reports`, los RPC, ambos buckets y los flujos con roles reales. Aplicar la migración, desplegar el commit e importar el CSV son tres acciones independientes: esta documentación no afirma que alguna ya se haya ejecutado en producción. No cargues datos ficticios en producción.
 
 Consulta [docs/render-deployment.md](docs/render-deployment.md) para el procedimiento exacto.

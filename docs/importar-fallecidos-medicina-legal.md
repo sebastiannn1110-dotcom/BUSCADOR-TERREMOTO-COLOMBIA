@@ -4,7 +4,7 @@ Este procedimiento maneja información oficial sensible. Preparar el archivo no 
 
 ## Prerrequisitos
 
-- Las seis migraciones deben estar aplicadas. Antes del push/deploy, el gate disponible es `npm run inspect:production` o una consulta administrativa directa a `reports_debug_snapshot`: debe confirmar `schemaVersion: "202608130002"`, `lastMigrationApplied: "202608130002"` y `deceasedFilterReady: true`. El `/api/health` nuevo se valida después del Manual Deploy.
+- Las siete migraciones deben estar aplicadas. Antes del push/deploy, el gate disponible es `npm run inspect:production` o una consulta administrativa directa a `reports_debug_snapshot`: debe confirmar `schemaVersion: "202608130003"`, `lastMigrationApplied: "202608130003"` y `deceasedFilterReady: true`. El `/api/health` nuevo se valida después del Manual Deploy.
 - La persona operadora debe tener un perfil Supabase Auth activo con rol `admin`.
 - `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` deben apuntar al proyecto de destino.
 - La sesión debe suministrar un `SUPABASE_ADMIN_ACCESS_TOKEN` vigente obtenido mediante una sesión normal de Supabase Auth de ese administrador. No uses `SUPABASE_SERVICE_ROLE_KEY` como sustituto; consulta [moderation-workflow.md](moderation-workflow.md#gestión-posterior-de-staff) para el mismo contrato operativo de token efímero.
@@ -110,7 +110,7 @@ Registro operativo del 13 de agosto de 2026: el preview autorizado clasificó la
    ```json
    {
      "databaseReachable": true,
-     "schemaVersion": "202608130002",
+     "schemaVersion": "202608130003",
      "deceasedRouteAvailable": true,
      "appUrlConfiguredCorrectly": true
    }

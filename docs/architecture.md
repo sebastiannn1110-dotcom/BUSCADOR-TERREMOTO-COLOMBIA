@@ -51,7 +51,7 @@ flowchart TD
 
 ## Esquema y migraciones
 
-Las seis migraciones son acumulativas. `202608130001_production_review_and_contact_followups.sql` agrega `contact_followups`, las colas/RPCs de revisión y el bucket de retratos. `202608130002_official_deceased_capture_and_diagnostics.sql` añade `reported_unit`, la bitácora privada idempotente de importación oficial y la versión de diagnóstico `202608130002` con conteos públicos agregados.
+Las siete migraciones son acumulativas. `202608130001_production_review_and_contact_followups.sql` agrega `contact_followups`, las colas/RPCs de revisión y el bucket de retratos. `202608130002_official_deceased_capture_and_diagnostics.sql` añade `reported_unit` y la bitácora privada idempotente de importación oficial. `202608130003_admin_case_withdrawal_and_message_threads.sql` incorpora retiro lógico auditado, gestión de personas publicadas, hilos privados por caso y la versión de diagnóstico `202608130003`.
 
 El endpoint temporal `GET /api/debug/reports`, protegido con `x-debug-token`, usa la service role para informar presencia de tablas, RPCs, buckets, RLS y última migración. No devuelve secretos, filas ni rutas de archivos.
 

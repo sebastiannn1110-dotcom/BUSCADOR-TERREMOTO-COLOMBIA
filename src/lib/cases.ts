@@ -1,5 +1,6 @@
 import { publicSupabase } from "./supabase/server";
 import { hasObviousContactData } from "./request-security";
+import { decodePublicCaseSlug } from "./public-case-route";
 import type { CaseCard, ConditionStatus, Sighting, VerificationLevel } from "./types";
 
 const conditionStatuses = new Set<ConditionStatus>([
@@ -124,7 +125,7 @@ export async function searchCases(query = "", filters: Record<string, string> = 
 export async function getCase(slug: string): Promise<CaseCard | null> {
   const db = publicSupabase();
   if (!db) return null;
-  const { data, error } = await db.rpc("get_public_case", { case_slug: slug });
+  const { data, error } = await db.rpc("get_public_case", { case_slug: decodePublicCaseSlug(slug) });
   if (error) return null;
   return sanitizePublicCase(Array.isArray(data) ? data[0] : null);
 }
