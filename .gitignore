@@ -1,8 +1,9 @@
 node_modules
-.next
+.next*/
 .env
 .env.local
 coverage
 playwright-report
 test-results
 *.tsbuildinfo
+supabase/.temp/

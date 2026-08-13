@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "generate:avatars": "tsx scripts/generate-test-avatars.ts",
+    "seed:demo": "node --env-file=.env scripts/seed-demo-cases.mjs",
     "verify:supabase": "node --env-file=.env scripts/verify-supabase-setup.mjs",
     "promote:admin": "tsx scripts/promote-admin.ts"
   },

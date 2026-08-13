@@ -1,25 +1,66 @@
 # Encontrarnos
 
-Plataforma móvil, privada por defecto, para publicar y buscar casos humanitarios revisados. No sustituye a las autoridades o servicios de emergencia.
+Plataforma móvil, privada por defecto, para buscar casos humanitarios revisados. No sustituye a las autoridades o servicios de emergencia.
 
-## Inicio rápido
+## Antes de publicar
 
-1. Instale Node 20+ y ejecute `npm install`.
-2. Copie `.env.example` a `.env.local` y complete las variables de Supabase. Nunca exponga `SUPABASE_SERVICE_ROLE_KEY`.
-3. En Supabase SQL Editor ejecute `supabase/migrations/202608120001_initial.sql`.
-4. Cree buckets privados para evidencia y uno público solo para retratos revisados; aplique políticas de Storage que permitan únicamente a moderadores escribir y publicar paths aprobados.
-5. Para la demo local, defina `ENABLE_TEST_DATA=true`, ejecute `npm run generate:avatars` y siembra `supabase/seed.sql` en una sesión con `set app.enable_test_data = 'true';`.
-   Después ejecute `npm run verify:supabase`; debe indicar exactamente 15 casos de prueba.
-6. Ejecute `npm run dev`. La salud está en `/api/health`.
+No mezcles personas ficticias con el proyecto de producción. Los 15 casos de prueba se deben cargar únicamente en una base de datos de desarrollo o demostración.
 
-## Moderación y administrador
+El repositorio no contiene secretos. Si alguna clave se compartió por chat, pantalla o se añadió al repositorio antes, revócala y genera una nueva en Supabase/OpenAI antes de desplegar.
 
-Registre primero el usuario con Supabase Auth. Con las variables de servidor cargadas, ejecute `npm run promote:admin -- correo@ejemplo.org`. Consulte `docs/moderation-workflow.md` antes de aprobar reportes o confirmar un fallecimiento.
+## Instalación local
 
-## IA, pruebas y Render
+1. Instala Node 20+ y ejecuta `npm install`.
+2. Copia `.env.example` a `.env.local` y completa las variables de servidor.
+3. En Supabase SQL Editor ejecuta, en este orden:
+   - `supabase/migrations/202608120001_initial.sql`
+   - `supabase/migrations/202608120002_harden_public_report_submission.sql`
+4. Crea un bucket privado para evidencia y un bucket público `public-portraits` solo para retratos aprobados. Aplica políticas de Storage que permitan escribir/publicar únicamente a moderadores.
+5. Ejecuta `npm run dev`.
 
-La ayuda conversacional requiere `OPENAI_API_KEY` y `OPENAI_MODEL`; sin ellas permanece disponible la búsqueda normal. Ejecute `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` y `npm run test:e2e`. Para Render, consulte [docs/render-deployment.md](docs/render-deployment.md).
+La ruta `/api/health` verifica la configuración básica.
 
-## Riesgos conocidos
+## Reportes seguros
 
-El CAPTCHA es una integración pendiente de proveedor: el servidor falla seguro sin secretos de configuración, pero debe conectarse antes de producción. También se requiere una consola administrativa autenticada completa para operar los flujos de moderación en la aplicación (RLS y modelo de datos ya los restringen en Supabase).
+Los reportes nuevos quedan en `pending_review`, los teléfonos y ubicaciones se almacenan privados y el navegador muestra un código de seguimiento. La migración 002 es obligatoria: contiene el RPC `submit_public_report`, límite de cinco envíos por 15 minutos y el cierre de los RPC públicos antiguos.
+
+Para producción configura en Render:
+
+```text
+CAPTCHA_PROVIDER=turnstile
+NEXT_PUBLIC_CAPTCHA_SITE_KEY=...
+CAPTCHA_SECRET_KEY=...
+IP_HASH_SECRET=<secreto largo y aleatorio>
+ENABLE_TEST_DATA=false
+```
+
+Sin CAPTCHA e `IP_HASH_SECRET`, los formularios se bloquean de forma segura en producción.
+
+## Ayuda con IA
+
+Configura `OPENAI_API_KEY` y `OPENAI_MODEL` únicamente en el servidor. La ayuda conversacional procesa una consulta breve con OpenAI para interpretar la búsqueda de casos públicos; no incluyas teléfonos, correos, direcciones exactas ni otros datos privados. Sin estas variables, la búsqueda normal sigue disponible.
+
+## Datos ficticios: solo demo
+
+Con una base de datos de demo, tras aplicar ambas migraciones y con `ENABLE_TEST_DATA=true`, usa una de estas opciones:
+
+- Ejecuta `supabase/seed.sql` en SQL Editor después de `set app.enable_test_data = 'true';`.
+- O, con credenciales de servicio solo en el entorno demo, define `DEMO_SEED_CONFIRMATION=seed-15-fictional-cases` y ejecuta `npm run seed:demo`.
+
+Después ejecuta `npm run verify:supabase`; debe indicar exactamente 15 casos de prueba. El sembrador crea únicamente datos marcados como ficticios y una imagen sintética.
+
+## Comprobaciones
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
+```
+
+## Render
+
+Configura un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Copia las variables de `.env.example` en el panel de Render, sin subirlas a Git. Ejecuta las dos migraciones de Supabase antes del despliegue, establece `APP_URL` con la URL HTTPS definitiva y desactiva `ENABLE_TEST_DATA`.
+
+Consulta [docs/render-deployment.md](docs/render-deployment.md), [docs/moderation-workflow.md](docs/moderation-workflow.md) y [docs/privacy-and-safety.md](docs/privacy-and-safety.md) antes de publicar casos reales.

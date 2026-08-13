@@ -1,6 +1,16 @@
 -- Run only in local development or a dedicated demo project with ENABLE_TEST_DATA=true.
 -- All people, locations and images are synthetic. The array values contain exactly 15 entries.
 do $$ begin if coalesce(current_setting('app.enable_test_data', true),'false') <> 'true' then raise notice 'Skipping demo data; set app.enable_test_data=true for a demo environment.'; return; end if; end $$;
+delete from public.case_reports r
+using public.cases c, public.people p
+where r.case_id = c.id
+  and c.person_id = p.id
+  and p.is_test_data
+  and r.report_type = 'sighting'
+  and r.moderation_status = 'approved'
+  and r.description = 'Avistamiento ficticio aprobado para datos de demostración.'
+  and coalesce(current_setting('app.enable_test_data', true), 'false') = 'true';
+
 with data(test_key,full_name,age,is_minor,condition,verification,urgency,last_seen,location,description,report_count) as (values
 ('demo-001','Valeria Montes Ríos',29,false,'missing','moderator_reviewed','priority','2026-08-08T18:20:00-05:00','Terminal Norte, Ciudad Ejemplo','Fue reportada separada de su familia durante una evacuación.',4),
 ('demo-002','Mateo Salcedo Luna',11,true,'missing','moderator_reviewed','critical','2026-08-09T10:40:00-05:00','Zona aproximada del Refugio Central, Ciudad Ejemplo','Fue visto por última vez mientras varias familias ingresaban al refugio.',2),
@@ -19,4 +29,10 @@ with data(test_key,full_name,age,is_minor,condition,verification,urgency,last_se
 ('demo-015','Luciana Torres Alba',15,true,'reunited','authority_confirmed','normal','2026-08-08T11:00:00-05:00','Centro Juvenil, zona aproximada','Fue localizada con vida y reunida con su familia.',4))
 , inserted_people as (insert into people(test_key,full_name,approximate_age,is_minor,public_description,is_test_data) select test_key,full_name,age,is_minor,description,true from data where coalesce(current_setting('app.enable_test_data', true),'false') = 'true' on conflict(test_key) do update set full_name=excluded.full_name returning id,test_key)
 , inserted_cases as (insert into cases(person_id,slug,publication_status,condition_status,verification_level,urgency_level,last_seen_at,last_seen_location_public,circumstances_public,published_at,authority_reference_private,resolution_notes_private) select p.id, d.test_key||'-'||regexp_replace(public.normalize_person_name(d.full_name),' ','-','g'),'published',d.condition::condition_status,d.verification::verification_level,d.urgency::urgency_level,d.last_seen::timestamptz,d.location,d.description,now(),case when d.condition='deceased_confirmed' then 'Referencia ficticia de autoridad' else null end,case when d.condition='deceased_confirmed' then 'Confirmación ficticia para demo' else null end from data d join inserted_people p using(test_key) on conflict(person_id) do update set publication_status='published' returning id,person_id)
-insert into case_reports(case_id,report_type,moderation_status,event_at,location_public,description) select c.id,'sighting','approved',d.last_seen::timestamptz,d.location,'Avistamiento ficticio aprobado para datos de demostración.' from inserted_cases c join people p on p.id=c.person_id join data d on d.test_key=p.test_key cross join lateral generate_series(1,d.report_count);
+insert into case_reports(case_id,report_type,moderation_status,event_at,location_public,description,tracking_code)
+select c.id,'sighting','approved',d.last_seen::timestamptz,d.location,'Avistamiento ficticio aprobado para datos de demostración.','EN-DEMO-' || upper(replace(d.test_key,'-','')) || '-' || lpad(n.value::text,2,'0')
+from inserted_cases c
+join people p on p.id=c.person_id
+join data d on d.test_key=p.test_key
+cross join lateral generate_series(1,d.report_count) as n(value)
+on conflict (tracking_code) do nothing;
