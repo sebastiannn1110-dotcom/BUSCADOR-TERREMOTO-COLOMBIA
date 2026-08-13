@@ -14,6 +14,8 @@ if (!response.ok) {
   throw new Error(`Supabase no está listo (${response.status}): ${detail.message || "aplica la migración inicial."}`);
 }
 const cases = await response.json();
-const testCases = cases.filter((item) => item.is_test_data).length;
-console.log(`Conexión correcta. Casos públicos: ${cases.length}. Casos de prueba: ${testCases}.`);
-if (testCases !== 15) process.exitCode = 2;
+if (!Array.isArray(cases)) throw new Error("Supabase devolvió una respuesta pública inesperada.");
+if (cases.some((item) => item?.is_test_data === true)) {
+  throw new Error("La proyección pública expuso datos marcados como prueba.");
+}
+console.log(`Conexión pública correcta. Casos publicados visibles: ${cases.length}. Datos de prueba expuestos: 0.`);

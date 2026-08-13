@@ -18,6 +18,7 @@ describe("GET /api/debug/reports", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "publishable-test-key");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-test-key");
+    vi.stubEnv("APP_URL", "https://example.invalid");
   });
 
   it("oculta el diagnóstico sin el token temporal", async () => {
@@ -48,6 +49,7 @@ describe("GET /api/debug/reports", () => {
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("reports_debug_snapshot");
     expect(body.environment.SUPABASE_SERVICE_ROLE_KEY).toBe("FOUND");
+    expect(body.environment.APP_URL).toBe("FOUND");
     expect(body.database.tables[0]).toMatchObject({ name: "people", rlsEnabled: true });
     expect(body.storage.bucketsFound).toEqual([{ name: "public-portraits", public: true }, { name: "report-evidence", public: false }]);
     expect(body.storage.usedByReportsRoute).toEqual(["report-evidence"]);

@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { hasObviousContactData } from "@/lib/request-security";
 
 export const officialImportHeaders = [
   "full_name",
   "approximate_age",
-  "gender",
   "source_name",
   "source_reference",
   "public_description",
@@ -16,9 +16,8 @@ export type OfficialImportRow = Record<(typeof officialImportHeaders)[number], s
 const rowSchema = z.object({
   full_name: z.string().trim().min(3).max(140),
   approximate_age: z.union([z.literal(""), z.string().regex(/^\d{1,3}$/).refine((value) => Number(value) <= 120, "La edad debe estar entre 0 y 120.")]),
-  gender: z.string().trim().max(80),
   source_name: z.string().trim().refine((value) => value.toLocaleLowerCase("es") === "medicina legal", "La fuente debe ser Medicina Legal."),
-  source_reference: z.string().trim().max(500),
+  source_reference: z.string().trim().min(1, "La referencia de la fuente oficial es obligatoria.").max(500),
   date_confirmed: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
   last_seen_location_public: z.string().trim().max(240),
   public_description: z.string().trim().max(800)
@@ -62,6 +61,9 @@ export function parseOfficialCsv(csv: string): OfficialImportRow[] {
     const candidate = Object.fromEntries(officialImportHeaders.map((header, index) => [header, values[index].trim()]));
     const parsed = rowSchema.safeParse(candidate);
     if (!parsed.success) throw new Error(`La fila ${rowIndex + 2} no es válida: ${parsed.error.issues[0]?.message || "revisa sus valores"}`);
+    if (hasObviousContactData(parsed.data.public_description) || hasObviousContactData(parsed.data.last_seen_location_public)) {
+      throw new Error(`La fila ${rowIndex + 2} contiene un teléfono o correo en un campo público.`);
+    }
     return parsed.data as OfficialImportRow;
   });
 }

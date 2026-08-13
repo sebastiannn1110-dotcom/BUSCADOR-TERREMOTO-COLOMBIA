@@ -11,7 +11,6 @@ const MAX_JSON_BYTES = 24 * 1024;
 const MAX_MULTIPART_BYTES = 9 * 1024 * 1024;
 const EVIDENCE_BUCKET = "report-evidence";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const demoCasePattern = /^demo-[0-9]{3}$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^\d{2}:\d{2}$/;
 
@@ -32,13 +31,52 @@ function statedLength(request: NextRequest) {
   return Number.isFinite(value) ? value : 0;
 }
 
-async function readRequest(request: NextRequest) {
-  const contentType = request.headers.get("content-type")?.toLowerCase() || "";
-  const limit = contentType.includes("multipart/form-data") ? MAX_MULTIPART_BYTES : MAX_JSON_BYTES;
-  if (statedLength(request) > limit) throw new RequestProblem(413, "El envío es demasiado grande.");
+async function readBoundedBody(request: NextRequest, limit: number) {
+  if (!request.body) return new Uint8Array();
 
-  if (contentType.includes("multipart/form-data")) {
-    const form = await request.formData();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.byteLength > limit - size) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The size rejection remains authoritative even if the client stream
+          // has already disconnected and cannot be cancelled cleanly.
+        }
+        throw new RequestProblem(413, "El envío es demasiado grande.");
+      }
+      chunks.push(value);
+      size += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (chunks.length === 0) return new Uint8Array();
+
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+async function readRequest(request: NextRequest) {
+  const contentType = request.headers.get("content-type") || "";
+  const limit = contentType.toLowerCase().includes("multipart/form-data") ? MAX_MULTIPART_BYTES : MAX_JSON_BYTES;
+  if (statedLength(request) > limit) throw new RequestProblem(413, "El envío es demasiado grande.");
+  const body = await readBoundedBody(request, limit);
+
+  if (contentType.toLowerCase().includes("multipart/form-data")) {
+    const form = await new Response(body, { headers: { "content-type": contentType } }).formData();
     const raw: Record<string, unknown> = {};
     for (const [key, value] of form.entries()) {
       if (!(value instanceof File)) raw[key] = value;
@@ -48,8 +86,7 @@ async function readRequest(request: NextRequest) {
     return { raw, photo };
   }
 
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > limit) throw new RequestProblem(413, "El envío es demasiado grande.");
+  const text = new TextDecoder().decode(body);
   try {
     return { raw: JSON.parse(text) as unknown, photo: null };
   } catch {
@@ -141,33 +178,22 @@ export async function POST(request: NextRequest) {
     let payload: Record<string, unknown>;
     if (isInformationReport) {
       const caseId = typeof raw.caseId === "string" ? raw.caseId.trim() : "";
-      const canResolveDemoCase = process.env.NODE_ENV !== "production" && process.env.ENABLE_TEST_DATA === "true" && demoCasePattern.test(caseId);
-      let resolvedCaseId = caseId;
-      if (!uuidPattern.test(caseId) && !canResolveDemoCase) return NextResponse.json({ message: "El identificador del caso no es válido." }, { status: 400 });
-      if (canResolveDemoCase) {
-        reportsLog("info", "Executing Supabase query", { requestId, query: 'rpc("get_public_case", { case_slug })' });
-        const { data, error } = await db.rpc("get_public_case", { case_slug: caseId });
-        reportsLog("info", "Supabase query completed", { requestId, query: 'rpc("get_public_case", { case_slug })', success: !error });
-        const demoId = typeof data?.[0]?.id === "string" ? data[0].id : null;
-        if (error || !demoId || !uuidPattern.test(demoId)) {
-          if (error) reportsLog("error", "Supabase query failed", { requestId, query: 'rpc("get_public_case", { case_slug })', error: reportError(error) });
-          return NextResponse.json({ message: "Este caso de demostración no está disponible para recibir información." }, { status: 404 });
-        }
-        resolvedCaseId = demoId;
-      }
+      if (!uuidPattern.test(caseId)) return NextResponse.json({ message: "El identificador del caso no es válido." }, { status: 400 });
       const information = parsed.data as typeof informationSchema._output;
       payload = {
         kind: "case_information",
-        caseId: resolvedCaseId,
+        caseId,
         reportType: information.reportType,
+        reportContext: information.reportType === "sighting" ? information.reportContext || null : null,
         eventAt: localTimestamp(information.eventAt || (information.eventDate ? `${information.eventDate}T${information.eventTime || "12:00"}` : undefined)),
         location: information.location || null,
         description: information.description,
-        reporterName: information.reporterName || null,
+        reporterName: null,
         phone: information.phone || null,
-        email: information.email || null,
-        relationship: information.relationship || null,
-        preferredContact: information.phone ? "phone" : information.email ? "email" : null,
+        email: null,
+        relationship: null,
+        preferredContact: information.phone ? "phone" : null,
+        consentAt: new Date().toISOString(),
         requestFingerprint: fingerprint
       };
     } else {
@@ -178,19 +204,20 @@ export async function POST(request: NextRequest) {
       payload = {
         kind: "missing_person",
         fullName: report.fullName,
-        alias: report.alias || null,
+        alias: null,
         approximateAge: report.approximateAge ?? null,
-        isMinor: report.isMinor,
+        isMinor: report.approximateAge === undefined || report.approximateAge < 18,
         lastSeenAt: `${date}T${time}:00-05:00`,
         location: report.location,
-        clothing: report.clothing || null,
-        features: report.features || null,
-        circumstances: report.circumstances,
+        clothing: null,
+        features: report.identificationDescription || null,
+        circumstances: null,
         reporterName: report.reporterName,
-        phone: report.phone || null,
-        email: report.email || null,
-        relationship: report.relationship || null,
-        preferredContact: report.phone ? "phone" : "email",
+        phone: report.phone,
+        email: null,
+        relationship: null,
+        preferredContact: "phone",
+        consentAt: new Date().toISOString(),
         requestFingerprint: fingerprint
       };
     }

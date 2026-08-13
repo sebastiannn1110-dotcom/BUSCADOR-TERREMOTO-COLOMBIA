@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-type StaffRole = "moderator" | "admin";
+type StaffRole = "moderator" | "responder" | "admin";
+type RequiredStaffRole = "admin" | "moderator_or_admin";
 
 export type StaffContext = {
   id: string;
@@ -34,12 +35,12 @@ export async function serverAuthSupabase() {
   });
 }
 
-export async function getStaffContext(requiredRole?: "admin") {
+export async function getStaffContext(requiredRole?: RequiredStaffRole) {
   const db = await serverAuthSupabase();
-  if (!db) return { db: null, staff: null };
+  if (!db) return { db: null, staff: null, authenticated: false };
 
   const { data: authData } = await db.auth.getUser();
-  if (!authData.user) return { db, staff: null };
+  if (!authData.user) return { db, staff: null, authenticated: false };
 
   const { data: profile, error } = await db
     .from("profiles")
@@ -47,13 +48,19 @@ export async function getStaffContext(requiredRole?: "admin") {
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (error || !profile?.active || !["moderator", "admin"].includes(profile.role)) {
-    return { db, staff: null };
+  if (error || !profile?.active || !["moderator", "responder", "admin"].includes(profile.role)) {
+    return { db, staff: null, authenticated: true };
   }
-  if (requiredRole === "admin" && profile.role !== "admin") return { db, staff: null };
+  if (requiredRole === "admin" && profile.role !== "admin") {
+    return { db, staff: null, authenticated: true };
+  }
+  if (requiredRole === "moderator_or_admin" && !["moderator", "admin"].includes(profile.role)) {
+    return { db, staff: null, authenticated: true };
+  }
 
   return {
     db,
+    authenticated: true,
     staff: {
       id: profile.id,
       displayName: profile.display_name,

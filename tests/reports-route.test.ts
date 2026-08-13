@@ -14,11 +14,11 @@ import { POST } from "@/app/api/reports/route";
 
 const missingPerson = {
   fullName: "Persona de prueba",
+  approximateAge: 30,
+  identificationDescription: "Chaqueta azul y una cicatriz pequeña.",
   lastSeenDate: "2026-08-11",
   lastSeenTime: "10:30",
   location: "Lugar aproximado de prueba",
-  isMinor: false,
-  circumstances: "Salió de casa y no regresó.",
   reporterName: "Quien reporta",
   phone: "3000000000",
   consent: true
@@ -30,6 +30,19 @@ function post(body: unknown) {
     headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.10" },
     body: typeof body === "string" ? body : JSON.stringify(body)
   }));
+}
+
+function oversizedMultipartRequest(contentLength?: string) {
+  const headers: Record<string, string> = {
+    "content-type": "multipart/form-data; boundary=reports-boundary",
+    "x-forwarded-for": "203.0.113.10"
+  };
+  if (contentLength !== undefined) headers["content-length"] = contentLength;
+  return new NextRequest("http://localhost/api/reports", {
+    method: "POST",
+    headers,
+    body: new Uint8Array(9 * 1024 * 1024 + 1)
+  });
 }
 
 describe("POST /api/reports", () => {
@@ -51,10 +64,79 @@ describe("POST /api/reports", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["sin Content-Length", undefined],
+    ["con Content-Length forjado", "128"]
+  ])("rechaza multipart mayor al límite %s antes de parsearlo", async (_label, contentLength) => {
+    const request = oversizedMultipartRequest(contentLength);
+    expect(request.headers.get("content-length")).toBe(contentLength ?? null);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect((await response.json()).message).toMatch(/demasiado grande/i);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it("valida el celular antes de enviar el reporte", async () => {
     const response = await post({ ...missingPerson, phone: "" });
     expect(response.status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["una fecha inexistente", { lastSeenDate: "2026-02-31" }],
+    ["un 29 de febrero fuera de año bisiesto", { lastSeenDate: "2026-02-29" }],
+    ["una hora fuera del reloj de 24 horas", { lastSeenTime: "99:99" }]
+  ])("rechaza %s antes de consultar Supabase", async (_label, override) => {
+    const response = await post({ ...missingPerson, ...override });
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["eventDate", { eventDate: "2026-04-31" }],
+    ["eventTime", { eventDate: "2026-08-12", eventTime: "24:00" }],
+    ["eventAt con calendario imposible", { eventAt: "2026-02-31T10:30" }],
+    ["eventAt con hora imposible", { eventAt: "2026-08-12T99:99" }],
+    ["eventAt con offset imposible", { eventAt: "2026-08-12T10:30+14:30" }]
+  ])("rechaza $0 inválido antes de consultar Supabase", async (_label, dateFields) => {
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      location: "Sector aproximado",
+      description: "Información ficticia suficientemente detallada.",
+      consent: true,
+      ...dateFields
+    });
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("acepta fechas reales, incluidos años bisiestos y fechas futuras", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-FECHA-VALIDA" }, error: null });
+    const response = await post({
+      ...missingPerson,
+      lastSeenDate: "2096-02-29",
+      lastSeenTime: "23:59"
+    });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload.lastSeenAt).toBe("2096-02-29T23:59:00-05:00");
+  });
+
+  it("acepta eventAt ISO válido y conserva la fecha futura para moderación", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-EVENTO-VALIDO" }, error: null });
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      eventAt: "2096-02-29T23:59",
+      location: "Sector aproximado",
+      description: "Información ficticia suficientemente detallada.",
+      consent: true
+    });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload.eventAt).toBe("2096-02-29T23:59:00-05:00");
   });
 
   it("usa únicamente el RPC seguro y devuelve el código", async () => {
@@ -67,7 +149,44 @@ describe("POST /api/reports", () => {
     expect(rpc.mock.calls[0][1].p_payload).toMatchObject({
       kind: "missing_person",
       fullName: missingPerson.fullName,
+      features: missingPerson.identificationDescription,
+      isMinor: false,
+      alias: null,
+      clothing: null,
+      circumstances: null,
+      email: null,
+      relationship: null,
+      consentAt: expect.any(String),
       requestFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/)
+    });
+  });
+
+  it.each([
+    { age: 17, expected: true },
+    { age: 18, expected: false },
+    { age: undefined, expected: true }
+  ])("deriva protección de menor con edad $age", async ({ age, expected }) => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-EDAD-SEGURA" }, error: null });
+    const response = await post({ ...missingPerson, approximateAge: age });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload.isMinor).toBe(expected);
+  });
+
+  it("ignora campos de contacto retirados aunque un cliente antiguo los envíe", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-CAMPOS-SEGUROS" }, error: null });
+    const response = await post({
+      ...missingPerson,
+      alias: "No debe persistirse",
+      email: "privado@example.invalid",
+      relationship: "Dato retirado",
+      circumstances: "Historia retirada"
+    });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({
+      alias: null,
+      email: null,
+      relationship: null,
+      circumstances: null
     });
   });
 
@@ -96,6 +215,7 @@ describe("POST /api/reports", () => {
     const response = await post({
       caseId: "11111111-1111-4111-8111-111111111111",
       reportType: "sighting",
+      reportContext: "sighting_alive",
       eventDate: "2026-08-12",
       location: "Sector aproximado",
       description: "La vi caminando cerca de un parque.",
@@ -103,8 +223,66 @@ describe("POST /api/reports", () => {
       condition_status: "deceased_confirmed"
     });
     expect(response.status).toBe(201);
-    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({ kind: "case_information", reportType: "sighting" });
+    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({
+      kind: "case_information",
+      reportType: "sighting",
+      reportContext: "sighting_alive",
+      reporterName: null,
+      email: null,
+      relationship: null,
+      consentAt: expect.any(String)
+    });
     expect(rpc.mock.calls[0][1].p_payload).not.toHaveProperty("condition_status");
+  });
+
+  it("exige lugar para los dos tipos de avistamiento", async () => {
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      reportContext: "sighting_alive",
+      description: "Información ficticia suficientemente detallada.",
+      consent: true
+    });
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("exige teléfono cuando el avistamiento es en un punto de atención", async () => {
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      reportContext: "sighting_care",
+      location: "Refugio aproximado",
+      description: "Información ficticia suficientemente detallada.",
+      consent: true
+    });
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("envía el contexto de atención y solo el teléfono privado", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-ATENCION" }, error: null });
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      reportContext: "sighting_care",
+      location: "Refugio aproximado",
+      description: "Información ficticia suficientemente detallada.",
+      phone: "3000000000",
+      reporterName: "Debe ignorarse",
+      email: "debe-ignorarse@example.invalid",
+      relationship: "Debe ignorarse",
+      consent: true
+    });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({
+      reportType: "sighting",
+      reportContext: "sighting_care",
+      phone: "3000000000",
+      reporterName: null,
+      email: null,
+      relationship: null
+    });
   });
 
   it("permite el envío con las protecciones de servidor cuando CAPTCHA no está configurado", async () => {
@@ -135,12 +313,12 @@ describe("POST /api/reports", () => {
     expect((await response.json()).message).toMatch(/varios reportes/i);
   });
 
-  it("registra el error completo de Supabase y correlaciona el 500", async () => {
+  it("registra metadatos seguros de Supabase y correlaciona el 500", async () => {
     const databaseError = {
       name: "PostgrestError",
       message: "column urgency_level is of type urgency_level but expression is of type text",
       code: "42804",
-      details: "Failing row contains diagnostic data",
+      details: "Failing row contains (Persona, 3001234567, persona@example.com)",
       hint: "Rewrite or cast the expression",
       constraint: "cases_urgency_level_check",
       table: "cases",
@@ -160,6 +338,9 @@ describe("POST /api/reports", () => {
     );
     expect(errorLog.mock.calls.flat().join(" ")).toContain('"table":"cases"');
     expect(errorLog.mock.calls.flat().join(" ")).toContain('"column":"urgency_level"');
+    expect(errorLog.mock.calls.flat().join(" ")).toContain('"details":"[REDACTED]"');
+    expect(errorLog.mock.calls.flat().join(" ")).not.toContain("3001234567");
+    expect(errorLog.mock.calls.flat().join(" ")).not.toContain("persona@example.com");
     errorLog.mockRestore();
   });
 });

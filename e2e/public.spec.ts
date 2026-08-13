@@ -1,26 +1,95 @@
 import { expect, test } from "@playwright/test";
-test("busca y abre un caso de demostración", async ({ page }) => { const searchResponse = page.waitForResponse((response) => response.url().includes("/api/search") && response.request().method() === "GET" && response.status() === 200); await page.goto("/buscar?q=Valeria"); await searchResponse; await expect(page.getByText("Valeria Montes Ríos")).toBeVisible(); await page.getByRole("link", { name: /Ver caso de Valeria/ }).click(); await expect(page.getByRole("heading", { name: "Valeria Montes Ríos" })).toBeVisible(); });
-test("la navegación funciona en móvil", async ({ page }) => { await page.setViewportSize({ width: 320, height: 700 }); await page.goto("/"); await expect(page.getByRole("heading", { name: "Encuentra a tu familiar" })).toBeVisible(); });
 
-test("el reporte público muestra foto opcional y tres pasos en móvil", async ({ page }) => {
+const fictionalPublicCase = {
+  id: "11111111-1111-4111-8111-111111111111",
+  slug: "persona-ficticia-e2e",
+  full_name: "Persona Ficticia E2E",
+  approximate_age: 35,
+  is_minor: false,
+  condition_status: "missing",
+  verification_level: "moderator_reviewed",
+  urgency_level: "normal",
+  last_seen_at: "2026-08-12T12:00:00Z",
+  last_seen_location_public: "Sector público ficticio",
+  primary_public_photo_url: null,
+  approved_reports_count: 1,
+  approved_sightings_count: 1,
+  latest_approved_sighting_location: "Parque ficticio",
+  updated_at: "2026-08-13T12:00:00Z",
+  is_test_data: false
+};
+
+test("la home muestra las dos categorías principales en móvil", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Encuentra a tu familiar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Desaparecidos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fallecidos confirmados" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver desaparecidos" })).toHaveAttribute("href", "/buscar?estado=missing");
+  await expect(page.getByRole("link", { name: "Ver fallecidos confirmados" })).toHaveAttribute("href", "/fallecidos");
+});
+
+test("los recursos sintéticos de demo no forman parte del sitio público", async ({ request }) => {
+  const response = await request.get("/test-avatars/demo-001.svg");
+  expect(response.status()).toBe(404);
+});
+
+test("la búsqueda usa resultados públicos simulados sin fixtures runtime", async ({ page }) => {
+  await page.route("**/api/search?**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [fictionalPublicCase] }) });
+  });
+  await page.goto("/buscar?q=Persona");
+  await expect(page.getByText("Persona Ficticia E2E")).toBeVisible();
+  await expect(page.getByText("Posibles avistamientos revisados")).toBeVisible();
+  await expect(page.getByText("Parque ficticio")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Tengo información / La vi" })).toHaveAttribute("href", "/persona/persona-ficticia-e2e/informacion");
+  await expect(page.locator("body")).not.toContainText("phone");
+  await expect(page.locator("body")).not.toContainText("email");
+});
+
+test("los filtros visibles construyen URLs con estado", async ({ page }) => {
+  await page.route("**/api/search?**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [] }) });
+  });
+  await page.goto("/buscar?estado=missing");
+  await expect(page.getByRole("link", { name: "Todos" })).toHaveAttribute("href", "/buscar");
+  await expect(page.getByRole("link", { name: "Desaparecidos" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("href", "/buscar?estado=deceased_confirmed");
+  await expect(page.getByRole("link", { name: "Localizados" })).toHaveAttribute("href", "/buscar?estado=located_alive");
+  await expect(page.getByRole("link", { name: "Reunidos" })).toHaveAttribute("href", "/buscar?estado=reunited");
+});
+
+test("el reporte público simplificado conserva foto opcional y tres pasos", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto("/reportar-desaparecido");
   await expect(page.getByText("Paso 1 de 3")).toBeVisible();
   await expect(page.getByText("Subir foto")).toBeVisible();
   await expect(page.getByText("Tomar foto")).toBeVisible();
   await expect(page.getByText(/Si no tienes foto, puedes continuar/)).toBeVisible();
+  await expect(page.getByLabel(/Descripción para identificarla/)).toBeVisible();
+  await expect(page.getByText(/Alias o nombre por el que/i)).toHaveCount(0);
+  await expect(page.getByText(/¿Es menor de edad?/i)).toHaveCount(0);
+
   await page.getByLabel("Nombre completo").fill("Persona Ficticia E2E");
-  await page.getByRole("radio", { name: "No", exact: true }).check();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page.getByText("Paso 2 de 3")).toBeVisible();
   await expect(page.getByLabel("Lugar aproximado")).toBeVisible();
+  await expect(page.getByText("Circunstancias", { exact: true })).toHaveCount(0);
+
+  await page.getByLabel("Fecha aproximada").fill("2026-08-12");
+  await page.getByLabel("Lugar aproximado").fill("Sector ficticio");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("Paso 3 de 3")).toBeVisible();
+  await expect(page.getByLabel("Tu nombre")).toBeVisible();
+  await expect(page.getByLabel("Número para contactarte")).toBeVisible();
+  await expect(page.getByLabel(/Confirmo que esta información es de buena fe/)).toBeVisible();
+  await expect(page.getByText(/Correo/i)).toHaveCount(0);
+  await expect(page.getByText(/Relación con la persona/i)).toHaveCount(0);
 });
 
-test("la ficha enlaza el formulario de información y protege avistamientos", async ({ page }) => {
-  await page.goto("/persona/valeria-montes-rios");
-  await expect(page.getByRole("heading", { name: "Avistamientos reportados" })).toBeVisible();
-  await expect(page.getByText("No hay avistamientos públicos aprobados todavía.")).toBeVisible();
-  await page.getByRole("link", { name: "Enviar información" }).click();
-  await expect(page.getByRole("heading", { name: /Enviar información sobre Valeria/ })).toBeVisible();
-  await expect(page.getByLabel("Adjuntar evidencia (opcional)")).toBeAttached();
+test("la confirmación distingue información recibida", async ({ page }) => {
+  await page.goto("/reporte/confirmacion/EN-FICTICIO-123?tipo=informacion");
+  await expect(page.getByRole("heading", { name: "Información recibida" })).toBeVisible();
+  await expect(page.getByText(/Será revisada por el equipo antes de mostrarse públicamente/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copiar enlace" })).toBeVisible();
 });

@@ -2,6 +2,9 @@
   "name": "encontrarnos",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,10 +14,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "staff:bootstrap": "tsx scripts/promote-admin.ts bootstrap",
+    "staff:manage": "tsx scripts/promote-admin.ts manage",
     "generate:avatars": "tsx scripts/generate-test-avatars.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo-cases.mjs",
-    "verify:supabase": "node --env-file=.env scripts/verify-supabase-setup.mjs",
-    "promote:admin": "tsx scripts/promote-admin.ts"
+    "verify:supabase": "node --env-file=.env scripts/verify-supabase-setup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -23,6 +27,7 @@
     "openai": "^4.86.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sharp": "0.35.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -40,5 +45,9 @@
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
+  },
+  "overrides": {
+    "postcss": "8.5.26",
+    "sharp": "$sharp"
   }
 }

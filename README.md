@@ -1,67 +1,95 @@
 # Encontrarnos
 
-Plataforma móvil, privada por defecto, para buscar casos humanitarios revisados. No sustituye a las autoridades o servicios de emergencia.
+Plataforma humanitaria, mobile-first y privada por defecto para buscar personas y recibir información comunitaria después de un desastre. No sustituye a las autoridades, los servicios de emergencia ni los canales oficiales de Medicina Legal.
 
-## Antes de publicar
+## Estado del repositorio
 
-No mezcles personas ficticias con el proyecto de producción. Los 15 casos de prueba se deben cargar únicamente en una base de datos de desarrollo o demostración.
+El código incluye búsqueda pública, reporte de personas desaparecidas, recepción y moderación de información, revisión y publicación de personas pendientes, seguimiento privado de contactos e importación oficial de fallecidos. Nada en este repositorio demuestra por sí solo que la migración más reciente esté aplicada o que el último commit esté desplegado en producción.
 
-El repositorio no contiene secretos. Si alguna clave se compartió por chat, pantalla o se añadió al repositorio antes, revócala y genera una nueva en Supabase/OpenAI antes de desplegar.
+No mezcles personas ficticias con producción. Los datos de prueba solo pueden sembrarse en desarrollo o demo después de establecer explícitamente `ENABLE_TEST_DATA=true`.
 
 ## Instalación local
 
-1. Instala Node 20+ y ejecuta `npm install`.
-2. Copia `.env.example` a `.env.local` y completa las variables de servidor.
-3. En Supabase SQL Editor ejecuta, en este orden:
+1. Instala Node.js 20.9 o superior y ejecuta `npm install`.
+2. Copia `.env.example` a `.env.local` y completa las variables necesarias.
+3. Aplica en Supabase, en orden, las cinco migraciones:
+
    - `supabase/migrations/202608120001_initial.sql`
    - `supabase/migrations/202608120002_harden_public_report_submission.sql`
    - `supabase/migrations/202608120003_fix_report_urgency_and_diagnostics.sql`
    - `supabase/migrations/202608120004_public_flows_and_official_imports.sql`
-4. La migración 004 crea o asegura el bucket privado `report-evidence`. Crea además un bucket público `public-portraits` solo para retratos aprobados y aplica políticas que permitan publicar únicamente a personal autorizado.
+   - `supabase/migrations/202608130001_production_review_and_contact_followups.sql`
+
+4. Verifica los buckets `report-evidence` —privado— y `public-portraits` —público y reservado a retratos aprobados—.
 5. Ejecuta `npm run dev`.
 
-La ruta `/api/health` verifica la configuración básica.
-
-## Reportes seguros
-
-Los casos nuevos quedan en `pending_review`, sus reportes en `pending`, los contactos, evidencia y ubicaciones se almacenan privados y el navegador muestra un código con URL de seguimiento. Las migraciones 002, 003 y 004 son obligatorias: contienen el RPC `submit_public_report`, el límite de cinco envíos por 15 minutos, el cierre de los RPC públicos antiguos, la corrección del enum de urgencia, la evidencia privada, avistamientos revisados y la importación oficial.
+La última migración añade el flujo de personas pendientes, seguimiento append-only de contactos, promoción segura de retratos, atribución pública controlada y endurecimiento de permisos. El backend convierte todo retrato aprobado a JPEG, corrige orientación, limita dimensiones y elimina metadatos antes de subirlo a `public-portraits`.
 
 ## Rutas principales
 
+- Inicio: `/`.
+- Buscar casos publicados: `/buscar`.
+- Fallecidos confirmados por autoridad: `/fallecidos`.
 - Reportar una persona: `/reportar-desaparecido` (`/reportar` redirige allí).
 - Enviar información: `/persona/[slug]/informacion`.
-- Ver confirmación: `/reporte/confirmacion/[trackingCode]`.
-- Moderar avistamientos: `/admin/avistamientos`.
-- Importar fallecidos de Medicina Legal: `/admin/importar-fallecidos` (solo `admin`).
+- Ver recibo: `/reporte/confirmacion/[trackingCode]`.
+- Revisar personas pendientes: `/admin/personas-pendientes`.
+- Moderar información: `/admin/avistamientos` (`/admin/posibles-avistamientos` es un alias).
+- Registrar seguimiento privado: `/admin/seguimiento-contactos`.
+- Importar fallecidos de Medicina Legal: `/admin/importar-fallecidos`, solo `admin`.
 
-Consulta [docs/routes.md](docs/routes.md) y [docs/importar-fallecidos-medicina-legal.md](docs/importar-fallecidos-medicina-legal.md). Para habilitar el panel crea usuarios con Supabase Auth y asigna perfiles activos `moderator` o `admin`; el script `npm run promote:admin` permite promover una cuenta de forma controlada.
+Consulta [docs/routes.md](docs/routes.md), [docs/privacy-and-safety.md](docs/privacy-and-safety.md) y [docs/PROJECT_CONTEXT_COMPLETE.md](docs/PROJECT_CONTEXT_COMPLETE.md).
 
-El diagnóstico temporal `GET /api/debug/reports` requiere el encabezado `x-debug-token` con el valor de `DEBUG_REPORTS_TOKEN`. Devuelve únicamente metadatos de esquema, RLS, migraciones, buckets y estados `FOUND`/`MISSING`; nunca devuelve claves, contactos, ubicaciones, filas privadas ni rutas de archivos. Elimina la variable cuando termine la investigación para deshabilitar el endpoint.
+## Privacidad y moderación
 
-Para producción configura en Render:
+Los casos nuevos quedan en `pending_review` y no aparecen públicamente hasta que un `moderator` o `admin` los revise. Contactos, evidencia original, ubicaciones exactas, notas, rutas privadas y referencias de autoridad nunca forman parte del contrato público. Los campos destinados a publicación se redactan de nuevo y rechazan patrones obvios de teléfono o correo.
+
+Los roles activos son:
+
+- `admin`: todas las funciones, incluida la importación oficial de fallecidos.
+- `moderator`: revisión de personas, moderación de reportes y escritura de seguimientos.
+- `responder`: acceso operativo de solo lectura a colas, contactos y evidencia autorizada.
+
+El primer `admin` se crea una sola vez con el RPC `bootstrap_initial_admin`, restringido a `service_role`, después de crear la cuenta en Supabase Auth. Un perfil admin o el evento histórico impiden reutilizar el bootstrap. Las altas y modificaciones posteriores se realizan con `manage_staff_profile` usando la sesión de un administrador activo. Ambos flujos exigen razón, se serializan para proteger al último administrador y escriben auditoría; nunca hagas `upsert` directo a `profiles`. Los comandos operativos son `npm run staff:bootstrap` y `npm run staff:manage`; consulta [docs/moderation-workflow.md](docs/moderation-workflow.md) antes de usarlos.
+
+Ninguna acción pública cambia el estado de un caso. `deceased_confirmed` es exclusivamente administrativo, exige confirmación de autoridad, justificación y referencia privada, y queda auditado.
+
+## Importación oficial
+
+El MVP acepta exclusivamente archivos CSV de Medicina Legal con estas columnas exactas:
 
 ```text
+full_name,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
+```
+
+`source_reference` es obligatoria. El proceso exige vista previa, confirmación explícita de la fuente y justificación; bloquea coincidencias ambiguas y vuelve a validar el archivo al confirmar. Consulta [docs/importar-fallecidos-medicina-legal.md](docs/importar-fallecidos-medicina-legal.md).
+
+## Variables de producción
+
+Configura en Render, sin imprimir ni subir secretos:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+APP_URL=https://tu-dominio.example
+ENABLE_TEST_DATA=false
 CAPTCHA_PROVIDER=turnstile
 NEXT_PUBLIC_CAPTCHA_SITE_KEY=...
 CAPTCHA_SECRET_KEY=...
 IP_HASH_SECRET=<secreto largo y aleatorio>
-ENABLE_TEST_DATA=false
 ```
 
-Turnstile es una capa adicional recomendada. Si no se configura por completo, los formularios siguen protegidos por límite de tamaño, honeypot, huella de servidor y límite de cinco envíos por 15 minutos; configura `IP_HASH_SECRET` con un secreto largo y aleatorio para independizar esa huella de la clave de servicio.
-
-## Ayuda con IA
-
-Configura `OPENAI_API_KEY` y `OPENAI_MODEL` únicamente en el servidor. La ayuda conversacional procesa una consulta breve con OpenAI para interpretar la búsqueda de casos públicos; no incluyas teléfonos, correos, direcciones exactas ni otros datos privados. Sin estas variables, la búsqueda normal sigue disponible.
+`OPENAI_API_KEY` y `OPENAI_MODEL` son opcionales. `DEBUG_REPORTS_TOKEN` habilita un endpoint temporal de diagnóstico y debe retirarse después de la investigación. El endpoint solo expone metadatos de esquema, RLS, migraciones, buckets y estados `FOUND`/`MISSING`, nunca valores secretos ni filas privadas.
 
 ## Datos ficticios: solo demo
 
-Con una base de datos de demo, tras aplicar ambas migraciones y con `ENABLE_TEST_DATA=true`, usa una de estas opciones:
+Con las cinco migraciones aplicadas en un proyecto separado de demo y `ENABLE_TEST_DATA=true`:
 
-- Ejecuta `supabase/seed.sql` en SQL Editor después de `set app.enable_test_data = 'true';`.
-- O, con credenciales de servicio solo en el entorno demo, define `DEMO_SEED_CONFIRMATION=seed-15-fictional-cases` y ejecuta `npm run seed:demo`.
+- Ejecuta `supabase/seed.sql` después de `set app.enable_test_data = 'true';`, o
+- define `DEMO_SEED_CONFIRMATION=seed-15-fictional-cases` y ejecuta `npm run seed:demo`.
 
-Después ejecuta `npm run verify:supabase`; debe indicar exactamente 15 casos de prueba. El sembrador crea únicamente datos marcados como ficticios y una imagen sintética.
+La proyección pública excluye deliberadamente esos registros, incluso en demo. Verifica la siembra desde una consulta administrativa controlada, no desde las RPC públicas.
 
 ## Comprobaciones
 
@@ -75,6 +103,6 @@ npm run test:e2e
 
 ## Render
 
-Configura un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Copia las variables de `.env.example` en el panel de Render, sin subirlas a Git. Ejecuta las cuatro migraciones de Supabase antes del despliegue, establece `APP_URL` con la URL HTTPS definitiva y desactiva `ENABLE_TEST_DATA`.
+Usa un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Aplica y verifica las cinco migraciones antes del despliegue; luego valida `/api/health`, los RPC, ambos buckets y los flujos con roles reales. No cargues datos ficticios en producción.
 
-Consulta [docs/render-deployment.md](docs/render-deployment.md), [docs/moderation-workflow.md](docs/moderation-workflow.md) y [docs/privacy-and-safety.md](docs/privacy-and-safety.md) antes de publicar casos reales.
+Consulta [docs/render-deployment.md](docs/render-deployment.md) para el procedimiento exacto.

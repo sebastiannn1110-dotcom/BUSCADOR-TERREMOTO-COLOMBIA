@@ -14,6 +14,25 @@
 .reviewed-badge { background: #dff5e8; border-radius: 20px; color: #074d32 !important; display: inline-flex !important; font-size: .8rem; font-weight: 700; margin-bottom: 7px; padding: 3px 9px; width: max-content; }
 .empty-sightings { background: #fff; border: 1px dashed #9aabab; padding: 18px; }
 .information-cta { background: #e9f3f3; border-radius: 8px; padding: 20px; }
+.detail-primary-action { margin-top: 12px; }
+.category-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 28px; }
+.category-panel { border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 280px; padding: clamp(22px, 4vw, 36px); }
+.category-panel h2 { font-size: clamp(1.7rem, 4vw, 2.35rem); line-height: 1.1; margin: 3px 0 12px; }
+.category-panel p:not(.category-kicker) { color: #334247; font-size: 1.05rem; margin: 0 0 24px; }
+.category-panel .button { margin-top: auto; width: fit-content; }
+.category-kicker { color: var(--teal-dark); font-size: .78rem; font-weight: 800; letter-spacing: .08em; margin: 0; text-transform: uppercase; }
+.missing-category { background: linear-gradient(145deg, #eef8f5, #dfeeed); border-color: #9ebfba; }
+.deceased-category { background: linear-gradient(145deg, #f5f6f7, #e7ebee); border-color: #b9c2c8; }
+.secondary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
+.status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 12px; }
+.status-filters a { background: #fff; border: 1px solid #829595; border-radius: 999px; color: var(--ink); font-weight: 700; min-height: 44px; padding: 9px 15px; text-decoration: none; }
+.status-filters a:hover { border-color: var(--teal); }
+.status-filters a.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.compact-section-title { align-items: center; margin-top: 24px; }
+.compact-section-title p { color: var(--muted); font-weight: 700; margin: 0; }
+.deceased-card { border-top: 4px solid var(--slate); }
+.deceased-card .card-actions { flex-direction: column; }
+.deceased-card .card-actions .button { width: 100%; }
 .request-links, .upload-actions, .moderation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .request-links { gap: 18px; margin-top: 22px; }
 .report-form .choice-group { border: 1px solid var(--line); padding: 12px; }
@@ -35,8 +54,14 @@
 .import-preview table { background: #fff; border-collapse: collapse; width: 100%; }
 .import-preview th, .import-preview td { border: 1px solid var(--line); padding: 10px; text-align: left; }
 .danger-button { background: var(--danger); }
+.pagination { display: flex; gap: 12px; justify-content: center; margin-top: 28px; }
+.page-indicator { color: var(--muted); font-weight: 700; }
 @media (max-width: 720px) {
+  .category-grid, .secondary-actions { grid-template-columns: 1fr; }
+  .category-panel { min-height: 240px; }
+  .category-panel .button { width: 100%; }
   .admin-grid { grid-template-columns: 1fr; }
   .admin-heading, .moderation-card header { flex-direction: column; }
   .upload-actions .button, .moderation-actions .button { width: 100%; }
+  .pagination { align-items: stretch; flex-direction: column; }
 }

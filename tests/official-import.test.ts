@@ -4,17 +4,30 @@ import { officialImportHeaders, parseOfficialCsv } from "@/lib/official-import";
 
 describe("importación oficial", () => {
   it("acepta un fallecido oficial sin foto y conserva solo las columnas permitidas", () => {
-    const csv = `${officialImportHeaders.join(",")}\nPersona Oficial,42,Femenino,Medicina Legal,Comunicado 04,Descripción pública,Lugar público,2026-08-12`;
+    const csv = `${officialImportHeaders.join(",")}\nPersona Oficial,42,Medicina Legal,Comunicado 04,Descripción pública,Lugar público,2026-08-12`;
     const rows = parseOfficialCsv(csv);
     expect(rows).toHaveLength(1);
     expect(rows[0].source_name).toBe("Medicina Legal");
     expect(rows[0]).not.toHaveProperty("primary_public_photo_path");
     expect(rows[0]).not.toHaveProperty("phone");
+    expect(officialImportHeaders).not.toContain("gender");
   });
 
   it("rechaza una fuente no oficial", () => {
-    const csv = `${officialImportHeaders.join(",")}\nPersona No Oficial,42,,Red social,,,,`;
+    const csv = `${officialImportHeaders.join(",")}\nPersona No Oficial,42,Red social,Publicación 1,,,`;
     expect(() => parseOfficialCsv(csv)).toThrow(/Medicina Legal/i);
+  });
+
+  it("exige source_reference para cada registro oficial", () => {
+    const csv = `${officialImportHeaders.join(",")}\nPersona Oficial,42,Medicina Legal,,Descripción pública,Lugar público,2026-08-12`;
+    expect(() => parseOfficialCsv(csv)).toThrow(/referencia.*obligatoria/i);
+  });
+
+  it("rechaza teléfonos y correos dentro de campos públicos", () => {
+    const withPhone = `${officialImportHeaders.join(",")}\nPersona Oficial,42,Medicina Legal,Comunicado 04,Llamar 300 123 4567,Lugar público,2026-08-12`;
+    const withEmail = `${officialImportHeaders.join(",")}\nPersona Oficial,42,Medicina Legal,Comunicado 04,Descripción pública,escribir@example.invalid,2026-08-12`;
+    expect(() => parseOfficialCsv(withPhone)).toThrow(/teléfono o correo/i);
+    expect(() => parseOfficialCsv(withEmail)).toThrow(/teléfono o correo/i);
   });
 
   it("la migración publica únicamente avistamientos aprobados y no proyecta contactos", () => {

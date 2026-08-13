@@ -6,6 +6,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createDemoPortraitJpeg, DEMO_PORTRAIT_MAX_BYTES } from "./lib/demo-portrait.mjs";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -22,7 +23,8 @@ if (process.env.DEMO_SEED_CONFIRMATION !== "seed-15-fictional-cases") {
 }
 
 const supabase = createClient(url, serviceKey, { auth: { persistSession: false }, realtime: { transport: false } });
-const imagePath = "demo/test-supplies.png";
+const imagePath = "demo/test-supplies.jpg";
+const legacyImagePath = "demo/test-supplies.png";
 const bucket = "public-portraits";
 const imageUrl = supabase.storage.from(bucket).getPublicUrl(imagePath).data.publicUrl;
 
@@ -49,11 +51,17 @@ function slug(value) {
 }
 function check(error, context) { if (error) throw new Error(`${context}: ${error.message}`); }
 
-const { error: bucketError } = await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: "8MB", allowedMimeTypes: ["image/png"] });
+const bucketOptions = { public: true, fileSizeLimit: DEMO_PORTRAIT_MAX_BYTES, allowedMimeTypes: ["image/jpeg"] };
+const { error: bucketError } = await supabase.storage.createBucket(bucket, bucketOptions);
 if (bucketError && !/exist|duplicate/i.test(bucketError.message)) check(bucketError, "No se pudo crear el bucket de retratos de prueba");
-const image = await readFile(join(process.cwd(), "public", "test-avatars", "test-supplies.png"));
-const { error: uploadError } = await supabase.storage.from(bucket).upload(imagePath, image, { contentType: "image/png", cacheControl: "31536000", upsert: true });
+const { error: bucketUpdateError } = await supabase.storage.updateBucket(bucket, bucketOptions);
+check(bucketUpdateError, "No se pudo asegurar la configuración JPEG del bucket de retratos de prueba");
+const sourceImage = await readFile(join(process.cwd(), "data", "test-avatars", "test-supplies.png"));
+const image = await createDemoPortraitJpeg(sourceImage);
+const { error: uploadError } = await supabase.storage.from(bucket).upload(imagePath, image, { contentType: "image/jpeg", cacheControl: "31536000", upsert: true });
 check(uploadError, "No se pudo subir la imagen sintética");
+const { error: legacyImageError } = await supabase.storage.from(bucket).remove([legacyImagePath]);
+check(legacyImageError, "No se pudo retirar el retrato PNG legado de demostración");
 
 const { data: people, error: peopleError } = await supabase.from("people").upsert(seed.map((item) => ({ test_key: item.testKey, full_name: item.fullName, approximate_age: item.age, is_minor: item.isMinor, aliases: [], public_description: item.description, is_test_data: true })), { onConflict: "test_key" }).select("id,test_key");
 check(peopleError, "No se pudieron crear las personas ficticias");
@@ -71,7 +79,7 @@ check(oldReportsError, "No se pudieron actualizar los avistamientos ficticios");
 const { error: oldMediaError } = await supabase.from("media_assets").delete().in("case_id", caseIds);
 check(oldMediaError, "No se pudieron actualizar las imágenes ficticias");
 
-const portraitRows = seed.map((item) => ({ case_id: caseIdByPersonId.get(personIdByKey.get(item.testKey)), asset_type: "portrait", storage_bucket: bucket, private_path: imagePath, public_path: imageUrl, original_filename: "test-supplies.png", detected_mime_type: "image/png", size_bytes: image.length }));
+const portraitRows = seed.map((item) => ({ case_id: caseIdByPersonId.get(personIdByKey.get(item.testKey)), asset_type: "portrait", storage_bucket: bucket, private_path: imagePath, public_path: imageUrl, original_filename: "test-supplies.jpg", detected_mime_type: "image/jpeg", size_bytes: image.length }));
 const { error: mediaError } = await supabase.from("media_assets").insert(portraitRows);
 check(mediaError, "No se pudieron registrar las imágenes ficticias");
 

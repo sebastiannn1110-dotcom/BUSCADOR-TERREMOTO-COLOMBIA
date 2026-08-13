@@ -4,10 +4,26 @@ const scriptSources = process.env.NODE_ENV === "development"
   ? "'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
   : "'self' 'unsafe-inline' https://challenges.cloudflare.com";
 
+function publicPortraitPattern() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!configuredUrl) return [];
+  try {
+    const url = new URL(configuredUrl);
+    return [{
+      protocol: url.protocol.replace(":", "") as "http" | "https",
+      hostname: url.hostname,
+      port: url.port,
+      pathname: "/storage/v1/object/public/public-portraits/**"
+    }];
+  } catch {
+    return [];
+  }
+}
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  images: { remotePatterns: [] },
+  images: { remotePatterns: publicPortraitPattern() },
   async headers() {
     return [{ source: "/(.*)", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },
