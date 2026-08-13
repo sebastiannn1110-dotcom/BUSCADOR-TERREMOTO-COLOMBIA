@@ -110,7 +110,7 @@ export default function ReportPage() {
       {step === 3 && <fieldset>
         <legend>Contacto</legend>
         <label>Tu nombre (privado)<input name="reporterName" required maxLength={140} autoComplete="name" autoCapitalize="words" defaultValue={String(draft.reporterName || "")} /></label>
-        <label>Número de celular (privado)<input name="phone" type="tel" inputMode="tel" autoComplete="tel" required minLength={7} maxLength={40} pattern="[0-9+\s()\-]+" aria-describedby="phone-help" defaultValue={String(draft.phone || "")} /></label>
+        <label>Número de celular (privado)<input name="phone" type="tel" inputMode="tel" autoComplete="tel" required minLength={7} maxLength={40} aria-describedby="phone-help" defaultValue={String(draft.phone || "")} /></label>
         <p id="phone-help" className="privacy-note">Usaremos este número solamente para revisar el reporte o pedir información adicional.</p>
       </fieldset>}
       {error && <p role="alert" className="form-error">{error}</p>}
