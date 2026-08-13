@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { informationSchema, reportSchema } from "@/lib/validation";
 import { requestFingerprint } from "@/lib/request-security";
+import { reportError, reportsLog } from "@/lib/reports-observability";
 import { adminSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -73,9 +75,20 @@ async function verifyCaptcha(token: string | undefined, request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = randomUUID();
+  reportsLog("info", "Request received", {
+    requestId,
+    method: request.method,
+    contentType: request.headers.get("content-type"),
+    contentLength: request.headers.get("content-length")
+  });
+
   try {
+    reportsLog("info", "Reading request body", { requestId });
     const body = await readJson(request);
+    reportsLog("info", "Request body read", { requestId });
     if (!body || typeof body !== "object" || Array.isArray(body)) {
+      reportsLog("info", "Body rejected", { requestId, reason: "not_an_object" });
       return NextResponse.json({ message: "Revisa los campos marcados e inténtalo de nuevo." }, { status: 400 });
     }
 
@@ -83,11 +96,25 @@ export async function POST(request: NextRequest) {
     const isInformationReport = Object.prototype.hasOwnProperty.call(raw, "caseId");
     const parsed = isInformationReport ? informationSchema.safeParse(raw) : reportSchema.safeParse(raw);
     if (!parsed.success) {
+      reportsLog("info", "Body validation failed", {
+        requestId,
+        reportKind: isInformationReport ? "case_information" : "missing_person",
+        issueCount: parsed.error.issues.length
+      });
       return NextResponse.json({ message: "Revisa los campos marcados e inténtalo de nuevo.", issues: parsed.error.flatten() }, { status: 400 });
     }
-    if (parsed.data.website) return NextResponse.json({ trackingCode: "RECIBIDO" });
+    reportsLog("info", "Body validated", {
+      requestId,
+      reportKind: isInformationReport ? "case_information" : "missing_person"
+    });
+    if (parsed.data.website) {
+      reportsLog("info", "Honeypot submission discarded", { requestId });
+      return NextResponse.json({ trackingCode: "RECIBIDO" });
+    }
 
+    reportsLog("info", "Verifying CAPTCHA", { requestId });
     const captcha = await verifyCaptcha(parsed.data.captchaToken, request);
+    reportsLog("info", "CAPTCHA checked", { requestId, result: captcha });
     if (captcha === "unconfigured") {
       return NextResponse.json({ message: "El envío seguro todavía no está configurado. Inténtalo más tarde." }, { status: 503 });
     }
@@ -95,15 +122,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Completa la verificación de seguridad e inténtalo de nuevo." }, { status: 400 });
     }
 
+    reportsLog("info", "Creating request fingerprint", { requestId });
     const fingerprint = requestFingerprint(request);
     if (!fingerprint) {
       return NextResponse.json({ message: "El envío seguro todavía no está configurado. Inténtalo más tarde." }, { status: 503 });
     }
+    reportsLog("info", "Request fingerprint created", { requestId });
 
+    reportsLog("info", "Creating Supabase client", { requestId });
     const db = adminSupabase();
     if (!db) {
       return NextResponse.json({ message: "El envío requiere configurar la conexión segura a Supabase." }, { status: 503 });
     }
+    reportsLog("info", "Supabase client created", { requestId });
 
     let payload: Record<string, unknown>;
     if (isInformationReport) {
@@ -114,9 +145,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "El identificador del caso no es válido." }, { status: 400 });
       }
       if (canResolveDemoCase) {
+        reportsLog("info", "Executing Supabase query", {
+          requestId,
+          query: 'rpc("get_public_case", { case_slug })'
+        });
         const { data, error } = await db.rpc("get_public_case", { case_slug: caseId });
+        reportsLog("info", "Supabase query completed", {
+          requestId,
+          query: 'rpc("get_public_case", { case_slug })',
+          success: !error
+        });
         const demoId = typeof data?.[0]?.id === "string" ? data[0].id : null;
         if (error || !demoId || !uuidPattern.test(demoId)) {
+          if (error) {
+            reportsLog("error", "Supabase query failed", {
+              requestId,
+              query: 'rpc("get_public_case", { case_slug })',
+              error: reportError(error)
+            });
+          }
           return NextResponse.json({ message: "Este caso de demostración no está disponible para recibir información." }, { status: 404 });
         }
         resolvedCaseId = demoId;
@@ -160,8 +207,23 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    reportsLog("info", "Report payload built", { requestId, reportKind: payload.kind });
+    reportsLog("info", "Executing Supabase query", {
+      requestId,
+      query: 'rpc("submit_public_report", { p_payload })'
+    });
     const { data, error } = await db.rpc("submit_public_report", { p_payload: payload });
+    reportsLog("info", "Supabase query completed", {
+      requestId,
+      query: 'rpc("submit_public_report", { p_payload })',
+      success: !error
+    });
     if (error) {
+      reportsLog("error", "Supabase query failed", {
+        requestId,
+        query: 'rpc("submit_public_report", { p_payload })',
+        error: reportError(error)
+      });
       if (error.code === "P0002") {
         return NextResponse.json({ message: "Este caso ya no está disponible para recibir información." }, { status: 404 });
       }
@@ -174,20 +236,30 @@ export async function POST(request: NextRequest) {
       if (error.code === "PGRST202") {
         return NextResponse.json({ message: "La base de datos aún necesita la migración de reportes." }, { status: 503 });
       }
-      console.error("Report submission database error", error.code);
-      return NextResponse.json({ message: "No pudimos enviar el reporte. Inténtalo de nuevo más tarde." }, { status: 500 });
+      return NextResponse.json({ message: "No pudimos enviar el reporte. Inténtalo de nuevo más tarde.", requestId }, { status: 500 });
     }
 
     const trackingCode = typeof data?.tracking_code === "string" ? data.tracking_code : null;
     if (!trackingCode) {
-      return NextResponse.json({ message: "No pudimos confirmar el envío del reporte." }, { status: 500 });
+      reportsLog("error", "RPC returned no tracking code", {
+        requestId,
+        query: 'rpc("submit_public_report", { p_payload })',
+        responseType: data === null ? "null" : typeof data
+      });
+      return NextResponse.json({ message: "No pudimos confirmar el envío del reporte.", requestId }, { status: 500 });
     }
+    reportsLog("info", "Finished successfully", { requestId });
     return NextResponse.json({ trackingCode }, { status: 201 });
   } catch (error) {
     if (error instanceof RequestProblem) {
+      reportsLog("info", "Request rejected", {
+        requestId,
+        status: error.status,
+        error: reportError(error)
+      });
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
-    console.error("Report submission failed");
-    return NextResponse.json({ message: "No pudimos enviar el reporte. Inténtalo de nuevo más tarde." }, { status: 500 });
+    reportsLog("error", "Request failed", { requestId, error: reportError(error) });
+    return NextResponse.json({ message: "No pudimos enviar el reporte. Inténtalo de nuevo más tarde.", requestId }, { status: 500 });
   }
 }

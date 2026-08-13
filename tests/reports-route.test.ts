@@ -89,4 +89,32 @@ describe("POST /api/reports", () => {
     expect(response.status).toBe(429);
     expect((await response.json()).message).toMatch(/varios reportes/i);
   });
+
+  it("registra el error completo de Supabase y correlaciona el 500", async () => {
+    const databaseError = {
+      name: "PostgrestError",
+      message: "column urgency_level is of type urgency_level but expression is of type text",
+      code: "42804",
+      details: "Failing row contains diagnostic data",
+      hint: "Rewrite or cast the expression",
+      constraint: "cases_urgency_level_check",
+      table: "cases",
+      column: "urgency_level"
+    };
+    rpc.mockResolvedValue({ data: null, error: databaseError });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await post(missingPerson);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(errorLog).toHaveBeenCalledWith(
+      "[REPORTS] Supabase query failed",
+      expect.stringContaining('"code":"42804"')
+    );
+    expect(errorLog.mock.calls.flat().join(" ")).toContain('"table":"cases"');
+    expect(errorLog.mock.calls.flat().join(" ")).toContain('"column":"urgency_level"');
+    errorLog.mockRestore();
+  });
 });

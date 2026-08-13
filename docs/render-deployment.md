@@ -2,7 +2,7 @@
 
 1. Crea un **Web Service** Node conectado al repositorio.
 2. Usa `npm ci && npm run build` como Build Command y `npm run start` como Start Command.
-3. En Supabase SQL Editor aplica, en orden, las migraciones `202608120001_initial.sql` y `202608120002_harden_public_report_submission.sql`.
+3. En Supabase SQL Editor aplica, en orden, las migraciones `202608120001_initial.sql`, `202608120002_harden_public_report_submission.sql` y `202608120003_fix_report_urgency_and_diagnostics.sql`.
 4. Configura todas las variables de `.env.example` en el panel de Render; nunca las subas a Git.
 5. Para producción establece:
 

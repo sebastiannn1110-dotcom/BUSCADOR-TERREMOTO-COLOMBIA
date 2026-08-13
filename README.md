@@ -15,6 +15,7 @@ El repositorio no contiene secretos. Si alguna clave se compartió por chat, pan
 3. En Supabase SQL Editor ejecuta, en este orden:
    - `supabase/migrations/202608120001_initial.sql`
    - `supabase/migrations/202608120002_harden_public_report_submission.sql`
+   - `supabase/migrations/202608120003_fix_report_urgency_and_diagnostics.sql`
 4. Crea un bucket privado para evidencia y un bucket público `public-portraits` solo para retratos aprobados. Aplica políticas de Storage que permitan escribir/publicar únicamente a moderadores.
 5. Ejecuta `npm run dev`.
 
@@ -22,7 +23,9 @@ La ruta `/api/health` verifica la configuración básica.
 
 ## Reportes seguros
 
-Los reportes nuevos quedan en `pending_review`, los teléfonos y ubicaciones se almacenan privados y el navegador muestra un código de seguimiento. La migración 002 es obligatoria: contiene el RPC `submit_public_report`, límite de cinco envíos por 15 minutos y el cierre de los RPC públicos antiguos.
+Los reportes nuevos quedan en `pending_review`, los teléfonos y ubicaciones se almacenan privados y el navegador muestra un código de seguimiento. Las migraciones 002 y 003 son obligatorias: contienen el RPC `submit_public_report`, el límite de cinco envíos por 15 minutos, el cierre de los RPC públicos antiguos y la corrección de tipos enum de urgencia.
+
+El diagnóstico temporal `GET /api/debug/reports` requiere el encabezado `x-debug-token` con el valor de `DEBUG_REPORTS_TOKEN`. Devuelve únicamente metadatos de esquema, RLS, migraciones, buckets y estados `FOUND`/`MISSING`; nunca devuelve claves, contactos, ubicaciones, filas privadas ni rutas de archivos. Elimina la variable cuando termine la investigación para deshabilitar el endpoint.
 
 Para producción configura en Render:
 
@@ -61,6 +64,6 @@ npm run test:e2e
 
 ## Render
 
-Configura un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Copia las variables de `.env.example` en el panel de Render, sin subirlas a Git. Ejecuta las dos migraciones de Supabase antes del despliegue, establece `APP_URL` con la URL HTTPS definitiva y desactiva `ENABLE_TEST_DATA`.
+Configura un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Copia las variables de `.env.example` en el panel de Render, sin subirlas a Git. Ejecuta las tres migraciones de Supabase antes del despliegue, establece `APP_URL` con la URL HTTPS definitiva y desactiva `ENABLE_TEST_DATA`.
 
 Consulta [docs/render-deployment.md](docs/render-deployment.md), [docs/moderation-workflow.md](docs/moderation-workflow.md) y [docs/privacy-and-safety.md](docs/privacy-and-safety.md) antes de publicar casos reales.
