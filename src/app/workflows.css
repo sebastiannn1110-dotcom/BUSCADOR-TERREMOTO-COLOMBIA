@@ -1,0 +1,42 @@
+.photo-placeholder {
+  align-content: center;
+  background: linear-gradient(145deg, #edf2f1, #dce8e6);
+  color: #425356;
+  display: grid;
+  height: 100%;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+  width: 100%;
+}
+.photo-placeholder span { font-size: 3rem; line-height: 1; }
+.photo-placeholder p { font-weight: 700; margin: 10px 0 0; max-width: 220px; }
+.reviewed-badge { background: #dff5e8; border-radius: 20px; color: #074d32 !important; display: inline-flex !important; font-size: .8rem; font-weight: 700; margin-bottom: 7px; padding: 3px 9px; width: max-content; }
+.empty-sightings { background: #fff; border: 1px dashed #9aabab; padding: 18px; }
+.information-cta { background: #e9f3f3; border-radius: 8px; padding: 20px; }
+.request-links, .upload-actions, .moderation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.request-links { gap: 18px; margin-top: 22px; }
+.report-form .choice-group { border: 1px solid var(--line); padding: 12px; }
+.report-form .choice-group legend { font-size: 1rem; margin: 0; padding: 0 4px; }
+.file-button { position: relative; }
+.field-label { display: block; font-weight: 700; margin-bottom: 6px; }
+.file-selected { color: var(--teal); font-weight: 700; }
+.urgent-note { background: #fde4e1; border-left: 5px solid var(--danger); padding: 12px; }
+.confirmation-page code { background: #fff; display: block; margin: 18px 0; overflow-wrap: anywhere; padding: 10px; }
+.admin-heading { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; }
+.admin-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); margin: 24px 0; }
+.moderation-list { display: grid; gap: 20px; }
+.moderation-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+.moderation-card header { display: flex; gap: 10px; justify-content: space-between; }
+.moderation-card h2 { margin: 0; }
+.compact-form { max-width: none; }
+.moderation-actions .button { font-size: .85rem; }
+.table-scroll { overflow: auto; }
+.import-preview table { background: #fff; border-collapse: collapse; width: 100%; }
+.import-preview th, .import-preview td { border: 1px solid var(--line); padding: 10px; text-align: left; }
+.danger-button { background: var(--danger); }
+@media (max-width: 720px) {
+  .admin-grid { grid-template-columns: 1fr; }
+  .admin-heading, .moderation-card header { flex-direction: column; }
+  .upload-actions .button, .moderation-actions .button { width: 100%; }
+}

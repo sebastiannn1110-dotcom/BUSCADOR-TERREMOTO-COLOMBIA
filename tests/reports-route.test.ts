@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const rpc = vi.fn();
+const upload = vi.fn();
+const remove = vi.fn();
+const from = vi.fn(() => ({ upload, remove }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  adminSupabase: () => ({ rpc })
+  adminSupabase: () => ({ rpc, storage: { from } })
 }));
 
 import { POST } from "@/app/api/reports/route";
@@ -14,8 +17,11 @@ const missingPerson = {
   lastSeenDate: "2026-08-11",
   lastSeenTime: "10:30",
   location: "Lugar aproximado de prueba",
+  isMinor: false,
+  circumstances: "Salió de casa y no regresó.",
   reporterName: "Quien reporta",
-  phone: "3000000000"
+  phone: "3000000000",
+  consent: true
 };
 
 function post(body: unknown) {
@@ -29,6 +35,9 @@ function post(body: unknown) {
 describe("POST /api/reports", () => {
   beforeEach(() => {
     rpc.mockReset();
+    upload.mockReset();
+    remove.mockReset();
+    from.mockClear();
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("CAPTCHA_PROVIDER", "");
     vi.stubEnv("CAPTCHA_SECRET_KEY", "");
@@ -60,6 +69,42 @@ describe("POST /api/reports", () => {
       fullName: missingPerson.fullName,
       requestFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/)
     });
+  });
+
+  it("envía un reporte sin foto sin tocar Storage", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-SIN-FOTO" }, error: null });
+    const response = await post(missingPerson);
+    expect(response.status).toBe(201);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("sube una foto privada y envía sus metadatos al RPC", async () => {
+    upload.mockResolvedValue({ data: { path: "private" }, error: null });
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-CON-FOTO" }, error: null });
+    const form = new FormData();
+    Object.entries(missingPerson).forEach(([key, value]) => form.set(key, String(value)));
+    form.set("photo", new File([new Uint8Array([1, 2, 3])], "persona.jpg", { type: "image/jpeg" }));
+    const response = await POST(new NextRequest("http://localhost/api/reports", { method: "POST", headers: { "x-forwarded-for": "203.0.113.10" }, body: form }));
+    expect(response.status).toBe(201);
+    expect(from).toHaveBeenCalledWith("report-evidence");
+    expect(upload).toHaveBeenCalledOnce();
+    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({ photoMimeType: "image/jpeg", photoOriginalName: "persona.jpg", photoSize: 3 });
+  });
+
+  it("crea información como reporte pendiente sin aceptar un estado público", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-AVISTAMIENTO" }, error: null });
+    const response = await post({
+      caseId: "11111111-1111-4111-8111-111111111111",
+      reportType: "sighting",
+      eventDate: "2026-08-12",
+      location: "Sector aproximado",
+      description: "La vi caminando cerca de un parque.",
+      consent: true,
+      condition_status: "deceased_confirmed"
+    });
+    expect(response.status).toBe(201);
+    expect(rpc.mock.calls[0][1].p_payload).toMatchObject({ kind: "case_information", reportType: "sighting" });
+    expect(rpc.mock.calls[0][1].p_payload).not.toHaveProperty("condition_status");
   });
 
   it("permite el envío con las protecciones de servidor cuando CAPTCHA no está configurado", async () => {

@@ -78,14 +78,14 @@ export async function GET(request: NextRequest) {
     name: bucket.name,
     public: bucket.public
   }));
-  const expectedBuckets = ["public-portraits"];
+  const expectedBuckets = ["public-portraits", "report-evidence"];
   const missingBuckets = expectedBuckets.filter((name) => !bucketsFound.some((bucket) => bucket.name === name));
 
   return NextResponse.json({
     environment,
     database: databaseError ? { error: reportError(databaseError) } : database,
     storage: {
-      usedByReportsRoute: [],
+      usedByReportsRoute: ["report-evidence"],
       expectedBuckets,
       bucketsFound,
       missingBuckets,

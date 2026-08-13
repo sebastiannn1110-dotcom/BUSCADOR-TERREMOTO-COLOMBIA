@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./mobile.css";
+import "./workflows.css";
 import { SiteHeader } from "@/components/site-header";
 import { brand } from "@/lib/brand";
 export const metadata: Metadata = { title: brand.name, description: "Plataforma comunitaria para ayudar a encontrar familiares.", icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }], shortcut: "/icon.svg" }, robots: { index: false, follow: false } };

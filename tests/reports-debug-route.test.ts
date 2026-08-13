@@ -36,7 +36,7 @@ describe("GET /api/debug/reports", () => {
       error: null
     });
     listBuckets.mockResolvedValue({
-      data: [{ name: "public-portraits", public: true }],
+      data: [{ name: "public-portraits", public: true }, { name: "report-evidence", public: false }],
       error: null
     });
 
@@ -49,7 +49,8 @@ describe("GET /api/debug/reports", () => {
     expect(rpc).toHaveBeenCalledWith("reports_debug_snapshot");
     expect(body.environment.SUPABASE_SERVICE_ROLE_KEY).toBe("FOUND");
     expect(body.database.tables[0]).toMatchObject({ name: "people", rlsEnabled: true });
-    expect(body.storage.bucketsFound).toEqual([{ name: "public-portraits", public: true }]);
+    expect(body.storage.bucketsFound).toEqual([{ name: "public-portraits", public: true }, { name: "report-evidence", public: false }]);
+    expect(body.storage.usedByReportsRoute).toEqual(["report-evidence"]);
     expect(body.storage.missingBuckets).toEqual([]);
   });
 });

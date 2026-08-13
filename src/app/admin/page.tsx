@@ -1,3 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AdminLogout } from "@/components/admin-logout";
+import { getStaffContext } from "@/lib/supabase/auth-server";
+
 export const dynamic = "force-dynamic";
-export default function AdminPage() { return <section className="admin"><h1>Moderación</h1><div className="security-panel"><h2>Acceso protegido</h2><p>El panel de moderación requiere iniciar sesión con una cuenta autorizada. Los datos de contacto, evidencia, ubicaciones exactas y notas internas nunca se cargan en páginas públicas.</p><p>Configure Supabase Auth y asigne el rol correspondiente con el script incluido antes de habilitar esta sección.</p><Link className="button" href="/">Volver al sitio público</Link></div><section><h2>Flujo de revisión</h2><ol><li>Revisar reportes pendientes, especialmente los urgentes.</li><li>Verificar evidencia y datos privados dentro de Supabase.</li><li>Aprobar, rechazar, escalar o marcar duplicado con una razón.</li><li>Solo administradores pueden confirmar fallecimientos con referencia de autoridad.</li></ol></section></section>; }
+
+export default async function AdminPage() {
+  const { staff } = await getStaffContext();
+  if (!staff) redirect("/admin/login?next=/admin");
+  return <section className="admin">
+    <div className="admin-heading"><div><h1>Moderación</h1><p>Sesión: {staff.displayName || staff.id} · {staff.role}</p></div><AdminLogout /></div>
+    <div className="admin-grid">
+      <Link className="action" href="/admin/avistamientos"><strong>Avistamientos pendientes</strong><small>Aprobar, rechazar, duplicar, escalar o solicitar información.</small></Link>
+      {staff.role === "admin" && <Link className="action" href="/admin/importar-fallecidos"><strong>Importar fallecidos oficiales</strong><small>Vista previa, detección de duplicados y confirmación auditada.</small></Link>}
+    </div>
+    <div className="security-panel"><h2>Datos protegidos</h2><p>Contactos, evidencia, ubicaciones privadas, referencias de autoridad y notas internas nunca se cargan en páginas públicas.</p></div>
+  </section>;
+}
