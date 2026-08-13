@@ -30,7 +30,7 @@ El archivo versionado y revisable es:
 data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv
 ```
 
-Contiene exactamente 39 registros, correspondientes a las filas de fuente 65–103, con esta cabecera de diez columnas:
+Contiene exactamente 142 registros, correspondientes a las filas de fuente 1–142, con esta cabecera de diez columnas:
 
 ```text
 source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
@@ -72,7 +72,7 @@ El comando llama primero a `preview_official_deceased_import`. Para este flujo c
 La migración `202608130002_official_deceased_capture_and_diagnostics.sql` añade la bitácora privada `official_deceased_import_entries`. La identidad idempotente de esta captura es la combinación `source_reference + source_row`:
 
 - repetir exactamente una fila ya importada produce `already_imported`; la bitácora compara además una huella canónica del contenido autorizado;
-- la misma referencia puede identificar las 39 filas porque cada una conserva su `source_row`;
+- la misma referencia puede identificar las 142 filas porque cada una conserva su `source_row`;
 - reutilizar la misma combinación para otra persona se bloquea para revisión;
 - cambiar edad, unidad, descripción, ubicación o fecha bajo la misma combinación también se bloquea para revisión;
 - no cambies `source_row` para eludir un conflicto.
@@ -97,11 +97,13 @@ Después ejecuta desde la raíz del repositorio y el commit aprobado:
 npm run import:official-deceased -- data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv
 ```
 
-El programa imprime dos líneas JSON agregadas: primero el resumen de preview y después un resumen final con `status`, `total`, `created`, `updated`, `alreadyImported`, `duplicatesBlocked` y `errors`. Si hay filas para revisión, el segundo resumen usa `status: "blocked"`, contabiliza `duplicatesBlocked`, no llama al RPC de importación y termina con código 2. Un error previo o de RPC devuelve `status: "error"`, `errors: 1`, contadores conservadores en cero y un mensaje sanitizado. No registra nombres, filas completas, token ni referencia privada. En este flujo seguro `updated` permanece en cero: cualquier coincidencia por nombre se bloquea. Para este archivo, `total` debe ser 39 y la suma de creados y ya importados debe cubrir las 39 filas sin errores.
+El programa imprime dos líneas JSON agregadas: primero el resumen de preview y después un resumen final con `status`, `total`, `created`, `updated`, `alreadyImported`, `duplicatesBlocked` y `errors`. Si hay filas para revisión, el segundo resumen usa `status: "blocked"`, contabiliza `duplicatesBlocked`, no llama al RPC de importación y termina con código 2. Un error previo o de RPC devuelve `status: "error"`, `errors: 1`, contadores conservadores en cero y un mensaje sanitizado. No registra nombres, filas completas, token ni referencia privada. En este flujo seguro `updated` permanece en cero: cualquier coincidencia por nombre se bloquea. Para este archivo, `total` debe ser 142 y la suma de creados y ya importados debe cubrir las 142 filas sin errores.
 
 Al terminar, elimina de la sesión `SUPABASE_ADMIN_ACCESS_TOKEN`, `OFFICIAL_IMPORT_REASON` y `CONFIRM_OFFICIAL_IMPORT`. Conserva el resumen agregado y la aprobación en el registro operativo correspondiente.
 
 ## Verificación en producción
+
+Registro operativo del 13 de agosto de 2026: el preview autorizado clasificó las 142 filas como `create`, sin revisiones; la importación creó 142 casos, sin actualizaciones, duplicados ni errores. Un replay inmediato confirmó idempotencia con `created = 0` y `alreadyImported = 142`. El snapshot posterior informó `deceasedConfirmed = 142`, `schemaVersion = 202608130002` y `deceasedFilterReady = true`.
 
 1. Después del Manual Deploy, abre `https://buscador-terremoto-colombia.onrender.com/api/health` y confirma:
 

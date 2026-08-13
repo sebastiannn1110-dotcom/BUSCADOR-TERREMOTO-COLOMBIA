@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { hasObviousContactData } from "@/lib/request-security";
 
 export const officialDeceasedCsvHeaders = [
@@ -45,6 +44,28 @@ export type OfficialImportRpc = (
   functionName: "preview_official_deceased_import" | "import_official_deceased",
   parameters: Record<string, unknown>,
 ) => Promise<RpcResponse>;
+
+function createOfficialImportRpc(environment: ImportEnvironment): OfficialImportRpc {
+  return async (functionName, parameters) => {
+    const response = await fetch(`${environment.url}/rest/v1/rpc/${functionName}`, {
+      method: "POST",
+      headers: {
+        apikey: environment.publishableKey,
+        Authorization: `Bearer ${environment.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(parameters),
+    });
+    const body = await response.json().catch(() => null) as unknown;
+    if (!response.ok) {
+      const code = body && typeof body === "object" && !Array.isArray(body) && "code" in body
+        ? String((body as { code?: unknown }).code ?? "HTTP_ERROR")
+        : `HTTP_${response.status}`;
+      return { data: null, error: { code } };
+    }
+    return { data: body, error: null };
+  };
+}
 
 export type PreviewSummary = {
   total: number;
@@ -348,17 +369,10 @@ async function main(): Promise<void> {
   }
   const bytes = await readFile(resolve(fileArguments[0]));
   const rows = parseOfficialDeceasedCsv(decodeOfficialDeceasedCsv(bytes));
-  const supabase = createClient(environment.url, environment.publishableKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${environment.accessToken}` } },
-  });
   const summary = await runOfficialDeceasedImport(
     rows,
     environment.reason,
-    async (functionName, parameters) => {
-      const { data, error } = await supabase.rpc(functionName, parameters);
-      return { data, error };
-    },
+    createOfficialImportRpc(environment),
     (preview) => console.log(JSON.stringify({ stage: "preview", ...preview })),
   );
   console.log(JSON.stringify({ stage: "import", ...summary }));

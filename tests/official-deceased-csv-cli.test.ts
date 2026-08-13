@@ -16,7 +16,7 @@ const csvBytes = readFileSync(csvPath);
 const csv = decodeOfficialDeceasedCsv(csvBytes);
 const rows = parseOfficialDeceasedCsv(csv);
 
-const expectedNames = [
+const expectedNames65To103 = [
   "Anselmo Guevara Navarro",
   "Carlos Alberto Jaramillo Duque",
   "Julián Arango Hernández",
@@ -58,18 +58,22 @@ const expectedNames = [
   "Omar Esquivel González",
 ];
 
-describe("CSV oficial Medicina Legal 65–103", () => {
-  it("está en UTF-8, tiene la cabecera exacta y exactamente 39 filas", () => {
+describe("CSV oficial Medicina Legal 1–142", () => {
+  it("está en UTF-8, tiene la cabecera exacta y exactamente 142 filas", () => {
     expect(csvBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))).toBe(false);
     expect(csv).not.toContain("\uFFFD");
     expect(csv.split(/\r?\n/u)[0]).toBe(officialDeceasedCsvHeaders.join(","));
-    expect(rows).toHaveLength(39);
-    expect(rows.map((row) => row.source_row)).toEqual(Array.from({ length: 39 }, (_, index) => index + 65));
-    expect(new Set(rows.map((row) => row.source_row)).size).toBe(39);
+    expect(rows).toHaveLength(142);
+    expect(rows.map((row) => row.source_row)).toEqual(Array.from({ length: 142 }, (_, index) => index + 1));
+    expect(new Set(rows.map((row) => row.source_row)).size).toBe(142);
   });
 
-  it("conserva literalmente los 39 nombres suministrados y los campos controlados", () => {
-    expect(rows.map((row) => row.full_name)).toEqual(expectedNames);
+  it("conserva el bloque 65–103 previamente auditado y los nuevos límites 1–64/104–142", () => {
+    expect(rows.slice(64, 103).map((row) => row.full_name)).toEqual(expectedNames65To103);
+    expect(rows[0]).toEqual(expect.objectContaining({ source_row: 1, full_name: "Fernando Alonso González", reported_unit: "Manizales" }));
+    expect(rows[63]).toEqual(expect.objectContaining({ source_row: 64, full_name: "María Rosalba Morales Batero", reported_unit: "Pereira" }));
+    expect(rows[103]).toEqual(expect.objectContaining({ source_row: 104, full_name: "N N V C", reported_unit: "Cali" }));
+    expect(rows[141]).toEqual(expect.objectContaining({ source_row: 142, full_name: "Elsa Valencia Giraldo", reported_unit: "Cali" }));
     expect(rows.every((row) => row.source_name === "Medicina Legal")).toBe(true);
     expect(rows.every((row) => row.source_reference === "Lista Medicina Legal aportada por administrador - captura 2026-08-13")).toBe(true);
     expect(rows.every((row) => row.public_description === "Información tomada de las listas de Medicina Legal.")).toBe(true);
@@ -79,11 +83,11 @@ describe("CSV oficial Medicina Legal 65–103", () => {
 
   it("envía source_row y reported_unit al RPC, pero omite gender", () => {
     const payload = toOfficialDeceasedRpcRows(rows);
-    expect(payload).toHaveLength(39);
-    expect(payload[0]).toEqual(expect.objectContaining({ source_row: 65, reported_unit: "Pereira" }));
-    expect(payload[38]).toEqual(expect.objectContaining({ source_row: 103, reported_unit: "Cali" }));
+    expect(payload).toHaveLength(142);
+    expect(payload[0]).toEqual(expect.objectContaining({ source_row: 1, reported_unit: "Manizales" }));
+    expect(payload[141]).toEqual(expect.objectContaining({ source_row: 142, reported_unit: "Cali" }));
     expect(payload.every((row) => !("gender" in row))).toBe(true);
-    expect(new Set(payload.map((row) => `${row.source_reference}:${row.source_row}`)).size).toBe(39);
+    expect(new Set(payload.map((row) => `${row.source_reference}:${row.source_row}`)).size).toBe(142);
   });
 
   it("rechaza cabecera alterada, source_row repetido, edad inválida y referencia vacía", () => {
@@ -134,16 +138,16 @@ describe("guardas y contrato del CLI oficial", () => {
       if (name === "preview_official_deceased_import") {
         return { data: rows.map(() => ({ decision: "already_imported" })), error: null };
       }
-      return { data: { created: 0, updated: 0, skipped: 39, alreadyImported: 39, total: 39 }, error: null };
+        return { data: { created: 0, updated: 0, skipped: 142, alreadyImported: 142, total: 142 }, error: null };
     };
 
     const summary = await runOfficialDeceasedImport(rows, validEnvironment.OFFICIAL_IMPORT_REASON!, rpc);
     expect(summary).toEqual({
       status: "ok",
-      total: 39,
+      total: 142,
       created: 0,
       updated: 0,
-      alreadyImported: 39,
+      alreadyImported: 142,
       duplicatesBlocked: 0,
       errors: 0,
     });
@@ -152,8 +156,8 @@ describe("guardas y contrato del CLI oficial", () => {
       "import_official_deceased",
     ]);
     const rpcRows = calls[0].parameters.p_rows as Array<Record<string, unknown>>;
-    expect(rpcRows).toHaveLength(39);
-    expect(rpcRows[0]).toEqual(expect.objectContaining({ source_row: 65, reported_unit: "Pereira" }));
+    expect(rpcRows).toHaveLength(142);
+    expect(rpcRows[0]).toEqual(expect.objectContaining({ source_row: 1, reported_unit: "Manizales" }));
     expect(rpcRows[0]).not.toHaveProperty("gender");
   });
 
@@ -168,7 +172,7 @@ describe("guardas y contrato del CLI oficial", () => {
     };
     await expect(runOfficialDeceasedImport(rows, validEnvironment.OFFICIAL_IMPORT_REASON!, rpc)).resolves.toEqual({
       status: "blocked",
-      total: 39,
+      total: 142,
       created: 0,
       updated: 0,
       alreadyImported: 0,
@@ -183,8 +187,8 @@ describe("guardas y contrato del CLI oficial", () => {
       data: null,
       error: {
         code: "42501",
-        message: `falló la fila ${expectedNames[0]}`,
-        details: expectedNames[1],
+        message: `falló la fila ${expectedNames65To103[0]}`,
+        details: expectedNames65To103[1],
       },
     })) as OfficialImportRpc;
     let captured = "";
@@ -194,8 +198,8 @@ describe("guardas y contrato del CLI oficial", () => {
       captured = error instanceof Error ? error.message : String(error);
     }
     expect(captured).toContain("code=42501");
-    expect(captured).not.toContain(expectedNames[0]);
-    expect(captured).not.toContain(expectedNames[1]);
+    expect(captured).not.toContain(expectedNames65To103[0]);
+    expect(captured).not.toContain(expectedNames65To103[1]);
   });
 
   it("publica el comando npm exacto sin ejecutarlo durante tests", () => {

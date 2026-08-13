@@ -102,9 +102,9 @@ Las credenciales del CLI de importación no deben quedar persistidas en Render. 
 
 `/api/health` comprueba configuración y hace una consulta segura al snapshot de diagnóstico, pero no sustituye una auditoría de RLS, grants, funciones y buckets. Contrasta también `/api/debug/reports` y Supabase antes de importar.
 
-## 5. Importación controlada de las filas 65–103
+## 5. Importación controlada de las filas 1–142
 
-El archivo versionado es `data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`: contiene 39 registros y la cabecera de diez columnas documentada en [importar-fallecidos-medicina-legal.md](importar-fallecidos-medicina-legal.md). Este CLI es distinto del importador web legado de siete columnas.
+El archivo versionado es `data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`: contiene 142 registros y la cabecera de diez columnas documentada en [importar-fallecidos-medicina-legal.md](importar-fallecidos-medicina-legal.md). Este CLI es distinto del importador web legado de siete columnas.
 
 Antes de ejecutarlo:
 
@@ -120,7 +120,7 @@ Ejecuta una sola vez desde el commit aprobado:
 npm run import:official-deceased -- data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv
 ```
 
-El comando ejecuta primero `preview_official_deceased_import`; si hay `reviewRequired`, se detiene sin llamar al RPC de importación. Una coincidencia solo por nombre siempre requiere revisión manual y nunca actualiza un caso. Si no hay bloqueos, llama a `import_official_deceased` y registra únicamente resúmenes agregados. El total final debe ser 39 entre `created` y `alreadyImported`, con `updated = 0`. Repetir exactamente el archivo es idempotente por `source_reference + source_row` y una huella canónica privada; cambiar el contenido con la misma clave se bloquea. Cada repetición sigue requiriendo autorización y credenciales vigentes.
+El comando ejecuta primero `preview_official_deceased_import`; si hay `reviewRequired`, se detiene sin llamar al RPC de importación. Una coincidencia solo por nombre siempre requiere revisión manual y nunca actualiza un caso. Si no hay bloqueos, llama a `import_official_deceased` y registra únicamente resúmenes agregados. El total final debe ser 142 entre `created` y `alreadyImported`, con `updated = 0`. Repetir exactamente el archivo es idempotente por `source_reference + source_row` y una huella canónica privada; cambiar el contenido con la misma clave se bloquea. Cada repetición sigue requiriendo autorización y credenciales vigentes.
 
 Después, elimina las variables transitorias, revisa `/fallecidos`, el conteo agregado y la auditoría administrativa. No proyectes `source_reference` en UI/API/logs públicos ni la copies fuera del artefacto operativo versionado; nunca copies el token.
 

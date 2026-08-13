@@ -65,7 +65,7 @@ Hay dos entradas deliberadamente separadas:
 full_name,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
 ```
 
-- La captura controlada entregada para el comunicado usa exclusivamente `data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`, con 39 filas de origen consecutivas, 65–103, y diez columnas:
+- La captura controlada entregada para el comunicado usa exclusivamente `data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`, con 142 filas de origen consecutivas, 1–142, y diez columnas:
 
 ```text
 source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
