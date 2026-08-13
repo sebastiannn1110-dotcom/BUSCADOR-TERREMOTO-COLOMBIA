@@ -32,6 +32,7 @@ describe("POST /api/reports", () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("CAPTCHA_PROVIDER", "");
     vi.stubEnv("CAPTCHA_SECRET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_CAPTCHA_SITE_KEY", "");
     vi.stubEnv("IP_HASH_SECRET", "");
   });
 
@@ -68,6 +69,18 @@ describe("POST /api/reports", () => {
     const response = await post(missingPerson);
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ trackingCode: "EN-SIN-CAPTCHA" });
+  });
+
+  it("no bloquea los reportes con una configuración CAPTCHA parcial", async () => {
+    rpc.mockResolvedValue({ data: { tracking_code: "EN-CAPTCHA-PARCIAL" }, error: null });
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "server-only-test-key");
+    vi.stubEnv("CAPTCHA_PROVIDER", "turnstile");
+
+    const response = await post(missingPerson);
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ trackingCode: "EN-CAPTCHA-PARCIAL" });
   });
 
   it("informa el límite de envíos sin revelar datos internos", async () => {

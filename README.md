@@ -34,7 +34,7 @@ IP_HASH_SECRET=<secreto largo y aleatorio>
 ENABLE_TEST_DATA=false
 ```
 
-Sin CAPTCHA e `IP_HASH_SECRET`, los formularios se bloquean de forma segura en producción.
+Turnstile es una capa adicional recomendada. Si no se configura por completo, los formularios siguen protegidos por límite de tamaño, honeypot, huella de servidor y límite de cinco envíos por 15 minutos; configura `IP_HASH_SECRET` con un secreto largo y aleatorio para independizar esa huella de la clave de servicio.
 
 ## Ayuda con IA
 

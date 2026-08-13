@@ -43,10 +43,13 @@ async function readJson(request: NextRequest): Promise<unknown> {
 async function verifyCaptcha(token: string | undefined, request: NextRequest) {
   const provider = process.env.CAPTCHA_PROVIDER;
   const secret = process.env.CAPTCHA_SECRET_KEY;
+  const siteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY;
 
   // CAPTCHA is an optional additional protection. The server still applies a
   // bounded request body, honeypot and database-backed rate limit without it.
-  if (!provider && !secret) return "skipped" as const;
+  // A partial Turnstile configuration cannot be completed by the browser, so
+  // keep CAPTCHA disabled until all values have been configured together.
+  if (!provider || !secret || !siteKey) return "skipped" as const;
   if (provider !== "turnstile" || !secret) return "unconfigured" as const;
   if (!token) return "invalid" as const;
 
