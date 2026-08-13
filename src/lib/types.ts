@@ -13,6 +13,7 @@ export type CaseCard = {
   urgency_level: string;
   last_seen_at: string | null;
   last_seen_location_public: string | null;
+  reported_unit?: string | null;
   primary_public_photo_url: string | null;
   approved_reports_count: number;
   updated_at: string;

@@ -85,6 +85,7 @@ export function sanitizePublicCase(value: unknown): CaseCard | null {
     urgency_level: text(source.urgency_level) || "normal",
     last_seen_at: text(source.last_seen_at),
     last_seen_location_public: safePublicText(source.last_seen_location_public),
+    reported_unit: safePublicText(source.reported_unit),
     primary_public_photo_url: text(source.primary_public_photo_url),
     approved_reports_count: approvedCount,
     approved_sightings_count: approvedCount,

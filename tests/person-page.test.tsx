@@ -64,4 +64,38 @@ describe("página pública del caso", () => {
     const page = await PersonPage({ params: Promise.resolve({ slug: "persona-sin-avistamientos" }) });
     expect(renderToStaticMarkup(page)).toContain("Todavía no hay posibles avistamientos revisados.");
   });
+
+  it("presenta un fallecido según la semántica de Unidad Básica y no como avistamiento", async () => {
+    getCase.mockResolvedValue({
+      id: "33333333-3333-4333-8333-333333333333",
+      slug: "persona-fallecida-oficial",
+      full_name: "Persona Fallecida Ficticia",
+      approximate_age: 76,
+      is_minor: false,
+      condition_status: "deceased_confirmed",
+      verification_level: "authority_confirmed",
+      urgency_level: "normal",
+      last_seen_at: null,
+      last_seen_location_public: "Pereira",
+      reported_unit: "Pereira",
+      primary_public_photo_url: null,
+      approved_reports_count: 0,
+      approved_sightings: [],
+      updated_at: "2026-08-13T12:00:00Z",
+      is_test_data: false,
+      public_description: "Información tomada de las listas de Medicina Legal.",
+      public_source_label: "Medicina Legal"
+    });
+    const page = await PersonPage({ params: Promise.resolve({ slug: "persona-fallecida-oficial" }) });
+    const html = renderToStaticMarkup(page);
+
+    expect(html).toContain("Declarado muerto por Medicina Legal");
+    expect(html).toContain("Unidad básica / lugar reportado");
+    expect(html).toContain("Información tomada de las listas de Medicina Legal");
+    expect(html).toContain("Tengo una corrección o información");
+    expect(html).toContain("?tipo=correction");
+    expect(html).not.toContain("Último lugar público conocido");
+    expect(html).not.toContain("Posibles avistamientos");
+    expect(html).not.toContain("Tengo información / La vi");
+  });
 });

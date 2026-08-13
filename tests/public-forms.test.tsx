@@ -69,15 +69,37 @@ describe("formularios públicos simplificados", () => {
 });
 
 describe("filtros públicos", () => {
-  it("muestra los cinco filtros visibles con URLs estado", async () => {
+  it("muestra solo los tres filtros públicos de esta fase", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) }));
     render(<SearchResults initialQuery="" initialStatus="missing" />);
     await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Todos" })).toHaveAttribute("href", "/buscar");
     expect(screen.getByRole("link", { name: "Desaparecidos" })).toHaveAttribute("href", "/buscar?estado=missing");
     expect(screen.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("href", "/buscar?estado=deceased_confirmed");
-    expect(screen.getByRole("link", { name: "Localizados" })).toHaveAttribute("href", "/buscar?estado=located_alive");
-    expect(screen.getByRole("link", { name: "Reunidos" })).toHaveAttribute("href", "/buscar?estado=reunited");
+    expect(screen.queryByRole("link", { name: "Localizados" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Reunidos" })).not.toBeInTheDocument();
+  });
+
+  it("trata los estados públicos no ofrecidos como Todos sin romper", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SearchResults initialQuery="" initialStatus="located_alive" />);
+    await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Todos" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Localizados" })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/search?q=", expect.any(Object));
+  });
+
+  it("consulta y marca el filtro de fallecidos confirmados", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SearchResults initialQuery="" initialStatus="deceased_confirmed" />);
+    await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("aria-current", "page");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search?q=&estado=deceased_confirmed",
+      expect.any(Object)
+    );
   });
 
   it("permite navegar páginas de resultados conservando el filtro", async () => {

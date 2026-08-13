@@ -5,6 +5,7 @@ import { adminSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
 const environmentNames = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -34,11 +35,14 @@ export async function GET(request: NextRequest) {
   const expectedToken = process.env.DEBUG_REPORTS_TOKEN?.trim();
   const receivedToken = request.headers.get("x-debug-token")?.trim() ?? "";
 
-  if (!expectedToken) {
-    return NextResponse.json({ message: "El endpoint de diagnóstico no está habilitado." }, { status: 503 });
+  if (!expectedToken || expectedToken.length < 32) {
+    return NextResponse.json(
+      { message: "El endpoint de diagnóstico no está habilitado." },
+      { status: 503, headers: privateHeaders }
+    );
   }
   if (!receivedToken || !sameToken(receivedToken, expectedToken)) {
-    return NextResponse.json({ message: "No encontrado." }, { status: 404 });
+    return NextResponse.json({ message: "No encontrado." }, { status: 404, headers: privateHeaders });
   }
 
   const environment = Object.fromEntries(environmentNames.map((name) => [name, configured(name)]));
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
       environment,
       database: { error: "Supabase server configuration is incomplete." },
       storage: { bucketsFound: [], error: "Supabase server configuration is incomplete." }
-    }, { status: 503 });
+    }, { status: 503, headers: privateHeaders });
   }
 
   const databaseQuery = 'rpc("reports_debug_snapshot")';
@@ -75,11 +79,13 @@ export async function GET(request: NextRequest) {
     reportsLog("info", "Debug query completed", { query: storageQuery });
   }
 
-  const bucketsFound = (buckets ?? []).map((bucket) => ({
-    name: bucket.name,
-    public: bucket.public
-  }));
   const expectedBuckets = ["public-portraits", "report-evidence"];
+  const bucketsFound = (buckets ?? [])
+    .filter((bucket) => expectedBuckets.includes(bucket.name))
+    .map((bucket) => ({
+      name: bucket.name,
+      public: bucket.public
+    }));
   const missingBuckets = expectedBuckets.filter((name) => !bucketsFound.some((bucket) => bucket.name === name));
 
   return NextResponse.json({
@@ -92,5 +98,8 @@ export async function GET(request: NextRequest) {
       missingBuckets,
       error: storageError ? reportError(storageError) : null
     }
-  }, { status: databaseError || storageError ? 503 : 200 });
+  }, {
+    status: databaseError || storageError ? 503 : 200,
+    headers: privateHeaders
+  });
 }

@@ -139,11 +139,11 @@ describe("POST /api/reports", () => {
     expect(rpc.mock.calls[0][1].p_payload.eventAt).toBe("2096-02-29T23:59:00-05:00");
   });
 
-  it("usa únicamente el RPC seguro y devuelve el código", async () => {
+  it("usa únicamente el RPC seguro y no devuelve el código interno", async () => {
     rpc.mockResolvedValue({ data: { tracking_code: "EN-PRUEBA-123" }, error: null });
     const response = await post(missingPerson);
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ trackingCode: "EN-PRUEBA-123" });
+    expect(await response.json()).toEqual({ received: true });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc.mock.calls[0][0]).toBe("submit_public_report");
     expect(rpc.mock.calls[0][1].p_payload).toMatchObject({
@@ -291,7 +291,7 @@ describe("POST /api/reports", () => {
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "server-only-test-key");
     const response = await post(missingPerson);
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ trackingCode: "EN-SIN-CAPTCHA" });
+    expect(await response.json()).toEqual({ received: true });
   });
 
   it("no bloquea los reportes con una configuración CAPTCHA parcial", async () => {
@@ -303,7 +303,7 @@ describe("POST /api/reports", () => {
     const response = await post(missingPerson);
 
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ trackingCode: "EN-CAPTCHA-PARCIAL" });
+    expect(await response.json()).toEqual({ received: true });
   });
 
   it("informa el límite de envíos sin revelar datos internos", async () => {

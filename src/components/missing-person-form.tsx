@@ -76,12 +76,12 @@ export function MissingPersonForm() {
     setError("");
     try {
       const response = await fetch("/api/reports", { method: "POST", body });
-      const data = await response.json().catch(() => null) as { message?: string; trackingCode?: string } | null;
-      if (!response.ok || !data?.trackingCode) {
+      const data = await response.json().catch(() => null) as { message?: string; received?: boolean } | null;
+      if (!response.ok || data?.received !== true) {
         setError(data?.message || "No pudimos enviar el reporte. Inténtalo de nuevo más tarde.");
         return;
       }
-      router.push(`/reporte/confirmacion/${encodeURIComponent(data.trackingCode)}`);
+      router.push("/reporte/confirmacion");
     } catch {
       setError("No pudimos enviar el reporte. Revisa tu conexión e inténtalo de nuevo.");
     } finally {

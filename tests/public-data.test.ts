@@ -18,6 +18,7 @@ const databaseRow = {
   urgency_level: "normal",
   last_seen_at: null,
   last_seen_location_public: "Sector público aproximado",
+  reported_unit: "Unidad básica pública",
   primary_public_photo_url: null,
   approved_reports_count: 1,
   approved_sightings_count: 1,
@@ -47,6 +48,7 @@ describe("proyección pública defensiva", () => {
     const safe = sanitizePublicCase(databaseRow);
     const json = JSON.stringify(safe);
     expect(safe?.full_name).toBe("Persona Pública Ficticia");
+    expect(safe?.reported_unit).toBe("Unidad básica pública");
     expect(safe?.approved_sightings?.[0]).toEqual(expect.objectContaining({ location_public: "Parque aproximado" }));
     expect(json).not.toContain("3009998877");
     expect(json).not.toContain("privado@example.invalid");
@@ -62,6 +64,7 @@ describe("proyección pública defensiva", () => {
       full_name: "Persona Ficticia",
       public_description: "Información útil; llamar al 300 123 4567",
       last_seen_location_public: "Escribir a privado@example.invalid",
+      reported_unit: "Llamar al 300 555 6789",
       latest_approved_sighting_location: "Teléfono +57 300 555 1234",
       approved_sightings: [{
         id: "22222222-2222-4222-8222-222222222222",
@@ -75,6 +78,7 @@ describe("proyección pública defensiva", () => {
     expect(unsafe).not.toBeNull();
     expect(unsafe?.public_description).toBeNull();
     expect(unsafe?.last_seen_location_public).toBeNull();
+    expect(unsafe?.reported_unit).toBeNull();
     expect(unsafe?.latest_approved_sighting_location).toBeNull();
     expect(unsafe?.approved_sightings).toEqual([]);
   });

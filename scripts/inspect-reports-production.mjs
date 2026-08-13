@@ -5,7 +5,7 @@
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-export const EXPECTED_SCHEMA_VERSION = "202608130001";
+export const EXPECTED_SCHEMA_VERSION = "202608130002";
 
 export const requiredEnvironment = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -13,11 +13,16 @@ export const requiredEnvironment = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "APP_URL",
   "IP_HASH_SECRET",
-  "CAPTCHA_PROVIDER",
-  "NEXT_PUBLIC_CAPTCHA_SITE_KEY",
-  "CAPTCHA_SECRET_KEY",
   "ENABLE_TEST_DATA"
 ];
+
+export const optionalCaptchaEnvironment = [
+  "CAPTCHA_PROVIDER",
+  "NEXT_PUBLIC_CAPTCHA_SITE_KEY",
+  "CAPTCHA_SECRET_KEY"
+];
+
+const EXPECTED_APP_URL = "https://buscador-terremoto-colombia.onrender.com";
 
 export const expectedTables = [
   "profiles",
@@ -30,6 +35,7 @@ export const expectedTables = [
   "audit_logs",
   "moderation_actions",
   "contact_followups",
+  "official_deceased_import_entries",
   "submission_rate_limits",
   "public_case_cards"
 ];
@@ -69,9 +75,12 @@ export const expectedRlsTables = [
   "media_assets",
   "moderation_actions",
   "contact_followups",
+  "official_deceased_import_entries",
   "status_history",
   "audit_logs"
 ];
+
+export const expectedForcedRlsTables = ["official_deceased_import_entries"];
 
 export const expectedBucketContracts = {
   "public-portraits": {
@@ -86,10 +95,11 @@ export const expectedBucketContracts = {
 
 export const expectedColumns = {
   people: ["id", "full_name", "normalized_name", "aliases", "approximate_age", "is_minor", "distinguishing_features", "private_notes"],
-  cases: ["id", "person_id", "slug", "publication_status", "condition_status", "verification_level", "last_seen_at", "last_seen_location_private", "last_seen_location_public", "authority_reference_private", "public_source_label", "primary_public_photo_path", "urgency_level"],
+  cases: ["id", "person_id", "slug", "publication_status", "condition_status", "verification_level", "last_seen_at", "last_seen_location_private", "last_seen_location_public", "reported_unit", "authority_reference_private", "public_source_label", "primary_public_photo_path", "urgency_level"],
   case_reports: ["id", "case_id", "report_type", "report_context", "description", "public_description", "location_private", "location_public", "moderation_status", "is_sensitive", "tracking_code"],
   reporter_contacts: ["id", "report_id", "reporter_name", "phone", "email", "preferred_contact_method"],
   contact_followups: ["id", "case_id", "report_id", "contact_id", "target_type", "contact_method", "contact_status", "summary_private", "next_followup_at", "created_by", "created_at"],
+  official_deceased_import_entries: ["id", "case_id", "source_reference", "source_row", "payload_fingerprint", "imported_by", "created_at"],
   submission_rate_limits: ["request_fingerprint", "window_started_at", "submission_count", "updated_at"]
 };
 
@@ -105,6 +115,27 @@ function exactStringSet(actual, expected) {
     && normalizedActual.every((value, index) => value === normalizedExpected[index]);
 }
 
+export function inspectEnvironment(environment) {
+  const names = [...requiredEnvironment, ...optionalCaptchaEnvironment];
+  const status = Object.fromEntries(names.map((name) => [
+    name,
+    typeof environment[name] === "string" && environment[name].trim() !== "" ? "FOUND" : "MISSING"
+  ]));
+  const configuredCaptchaValues = optionalCaptchaEnvironment
+    .filter((name) => status[name] === "FOUND").length;
+  const captchaDisabled = configuredCaptchaValues === 0;
+  const captchaComplete = configuredCaptchaValues === optionalCaptchaEnvironment.length
+    && environment.CAPTCHA_PROVIDER?.trim().toLowerCase() === "turnstile";
+  return {
+    status,
+    policy: {
+      appUrlExact: environment.APP_URL?.trim() === EXPECTED_APP_URL,
+      testDataDisabled: environment.ENABLE_TEST_DATA?.trim().toLowerCase() === "false",
+      captchaConfigurationComplete: captchaDisabled || captchaComplete
+    }
+  };
+}
+
 function safeDatabaseSnapshot(snapshot) {
   if (!isRecord(snapshot)) return null;
   const allowListedTableNames = new Set([...expectedRlsTables, "public_case_cards"]);
@@ -114,6 +145,20 @@ function safeDatabaseSnapshot(snapshot) {
   return {
     schemaVersion: typeof snapshot.schemaVersion === "string" ? snapshot.schemaVersion : null,
     lastMigrationApplied: typeof snapshot.lastMigrationApplied === "string" ? snapshot.lastMigrationApplied : null,
+    publishedCounts: isRecord(snapshot.publishedCounts)
+      ? {
+          missing: Number.isSafeInteger(snapshot.publishedCounts.missing) && snapshot.publishedCounts.missing >= 0
+            ? snapshot.publishedCounts.missing
+            : null,
+          deceasedConfirmed: Number.isSafeInteger(snapshot.publishedCounts.deceasedConfirmed)
+            && snapshot.publishedCounts.deceasedConfirmed >= 0
+            ? snapshot.publishedCounts.deceasedConfirmed
+            : null
+        }
+      : null,
+    deceasedFilterReady: typeof snapshot.deceasedFilterReady === "boolean"
+      ? snapshot.deceasedFilterReady
+      : null,
     tables: Array.isArray(snapshot.tables)
       ? snapshot.tables
         .filter((item) => isRecord(item) && allowListedTableNames.has(item.name))
@@ -147,6 +192,7 @@ function safeDatabaseSnapshot(snapshot) {
 
 export function evaluateProductionContract({
   environment,
+  environmentPolicy,
   schemaResult,
   databaseSnapshot,
   storageBuckets,
@@ -157,6 +203,11 @@ export function evaluateProductionContract({
 
   for (const name of requiredEnvironment) {
     if (environment?.[name] !== "FOUND") failures.push(`environment:${name}:missing`);
+  }
+  if (environmentPolicy?.appUrlExact !== true) failures.push("environment:APP_URL:invalid");
+  if (environmentPolicy?.testDataDisabled !== true) failures.push("environment:ENABLE_TEST_DATA:not-false");
+  if (environmentPolicy?.captchaConfigurationComplete !== true) {
+    failures.push("environment:captcha:partial-configuration");
   }
 
   const schema = schemaResult?.schema;
@@ -187,6 +238,14 @@ export function evaluateProductionContract({
     if (snapshot.lastMigrationApplied !== EXPECTED_SCHEMA_VERSION) {
       failures.push("database:last-migration:mismatch");
     }
+    if (snapshot.publishedCounts?.missing === null
+      || snapshot.publishedCounts?.deceasedConfirmed === null
+      || !snapshot.publishedCounts) {
+      failures.push("database:published-counts:invalid");
+    }
+    if (snapshot.deceasedFilterReady !== true) {
+      failures.push("database:deceased-filter:not-ready");
+    }
 
     const tablesByName = new Map(snapshot.tables.map((item) => [item.name, item]));
     for (const name of expectedRlsTables) {
@@ -194,6 +253,11 @@ export function evaluateProductionContract({
       if (!table?.found) failures.push(`database:table:${name}:missing`);
       else if (table.kind !== "table" || table.rlsEnabled !== true) {
         failures.push(`database:rls:${name}:disabled`);
+      }
+    }
+    for (const name of expectedForcedRlsTables) {
+      if (tablesByName.get(name)?.rlsForced !== true) {
+        failures.push(`database:rls:${name}:not-forced`);
       }
     }
 
@@ -252,10 +316,8 @@ export function createSchemaResult(openApi) {
 }
 
 export async function main() {
-  const environment = Object.fromEntries(requiredEnvironment.map((name) => [
-    name,
-    typeof process.env[name] === "string" && process.env[name].trim() !== "" ? "FOUND" : "MISSING"
-  ]));
+  const environmentInspection = inspectEnvironment(process.env);
+  const environment = environmentInspection.status;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
@@ -309,6 +371,7 @@ export async function main() {
 
   const validation = evaluateProductionContract({
     environment,
+    environmentPolicy: environmentInspection.policy,
     schemaResult,
     databaseSnapshot,
     storageBuckets: buckets,

@@ -15,6 +15,7 @@ Se pueden publicar, tras revisión:
 - retrato expresamente aprobado;
 - avistamientos aprobados con ubicación y descripción públicas;
 - etiqueta de fuente pública, por ejemplo `Medicina Legal`.
+- unidad básica o lugar reportado por la fuente, sin presentarlo como lugar de muerte.
 
 Nunca se publican:
 
@@ -71,4 +72,4 @@ Los reportes de posible atrapamiento o posible fallecimiento exigen contacto y s
 
 ## Responsabilidades operativas pendientes
 
-Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las cinco migraciones, RLS, grants, RPCs y buckets coincidan con el repositorio.
+Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las seis migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.

@@ -1006,9 +1006,200 @@ begin
     raise exception 'Duplicate source-reference batch was not blocked';
   end if;
 
-  -- Importing an official row over an existing missing case must produce the
-  -- missing -> deceased transition history through the safety trigger, plus
-  -- the import moderation and audit records. Empty date stays unknown.
+  -- One official publication reference may legitimately identify many rows.
+  -- source_row is the private, composite idempotency key for that case.
+  v_result := public.preview_official_deceased_import(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '65',
+      'reported_unit', 'Pereira',
+      'full_name', 'Persona Ficticia Fuente Compartida Uno SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    ),
+    jsonb_build_object(
+      'source_row', '66',
+      'reported_unit', 'Cali',
+      'full_name', 'Persona Ficticia Fuente Compartida Dos SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    )
+  ));
+  if v_result #>> '{0,decision}' <> 'create'
+    or v_result #>> '{1,decision}' <> 'create' then
+    raise exception 'Distinct source rows sharing one reference were blocked';
+  end if;
+
+  v_result := public.import_official_deceased(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '65',
+      'reported_unit', 'Pereira',
+      'full_name', 'Persona Ficticia Fuente Compartida Uno SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    ),
+    jsonb_build_object(
+      'source_row', '66',
+      'reported_unit', 'Cali',
+      'full_name', 'Persona Ficticia Fuente Compartida Dos SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    )
+  ), 'Prueba ficticia de referencia oficial compartida por filas');
+  if (v_result ->> 'created')::integer <> 2
+    or (select count(*) from public.official_deceased_import_entries
+        where source_reference = 'Lista oficial ficticia compartida') <> 2
+    or exists (
+      select 1 from public.cases
+      where authority_reference_private <> 'Lista oficial ficticia compartida'
+        and id in (
+          select case_id from public.official_deceased_import_entries
+          where source_reference = 'Lista oficial ficticia compartida'
+        )
+  ) then
+    raise exception 'Shared-reference official import did not preserve exact private attribution';
+  end if;
+  select count(*) into v_count_before
+  from public.audit_logs
+  where action = 'official_deceased_imported'
+    and entity_id in (
+      select case_id from public.official_deceased_import_entries
+      where source_reference = 'Lista oficial ficticia compartida'
+    );
+
+  v_result := public.import_official_deceased(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '65',
+      'reported_unit', 'Pereira',
+      'full_name', 'Persona Ficticia Fuente Compartida Uno SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    ),
+    jsonb_build_object(
+      'source_row', '66',
+      'reported_unit', 'Cali',
+      'full_name', 'Persona Ficticia Fuente Compartida Dos SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    )
+  ), 'Reintento ficticio de referencia oficial compartida por filas');
+  if (v_result ->> 'skipped')::integer <> 2
+    or (select count(*) from public.official_deceased_import_entries
+        where source_reference = 'Lista oficial ficticia compartida') <> 2
+    or (select count(*)
+        from public.audit_logs
+        where action = 'official_deceased_imported'
+          and entity_id in (
+            select case_id from public.official_deceased_import_entries
+            where source_reference = 'Lista oficial ficticia compartida'
+          )) <> v_count_before then
+    raise exception 'Composite source-row replay was not idempotent';
+  end if;
+
+  -- A later batch may add another row from the same publication. The common
+  -- authority reference must not make a fresh composite source row ambiguous.
+  v_result := public.preview_official_deceased_import(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '67',
+      'reported_unit', 'Manizales',
+      'full_name', 'Persona Ficticia Fuente Compartida Tres SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    )
+  ));
+  if v_result #>> '{0,decision}' <> 'create' then
+    raise exception 'Incremental distinct source row sharing one reference was blocked';
+  end if;
+
+  v_result := public.import_official_deceased(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '67',
+      'reported_unit', 'Manizales',
+      'full_name', 'Persona Ficticia Fuente Compartida Tres SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia compartida'
+    )
+  ), 'Prueba ficticia incremental de referencia oficial compartida');
+  if (v_result ->> 'created')::integer <> 1
+    or (select count(*) from public.official_deceased_import_entries
+        where source_reference = 'Lista oficial ficticia compartida') <> 3
+    or not exists (
+      select 1
+      from public.official_deceased_import_entries e
+      join public.cases c on c.id = e.case_id
+      where e.source_reference = 'Lista oficial ficticia compartida'
+        and e.source_row = 67
+        and c.authority_reference_private = 'Lista oficial ficticia compartida'
+    ) then
+    raise exception 'Incremental shared-reference import did not preserve composite identity';
+  end if;
+
+  v_result := public.preview_official_deceased_import(jsonb_build_array(
+    jsonb_build_object(
+      'source_row', '301',
+      'full_name', 'Persona Ficticia Colision Uno SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia con colision'
+    ),
+    jsonb_build_object(
+      'source_row', '301',
+      'full_name', 'Persona Ficticia Colision Dos SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia con colision'
+    )
+  ));
+  if v_result #>> '{0,decision}' <> 'review_required'
+    or v_result #>> '{1,decision}' <> 'review_required'
+    or v_result #>> '{0,reviewReason}' <> 'duplicate_source_reference_row_in_file' then
+    raise exception 'Duplicate composite official source key was not flagged';
+  end if;
+  v_failed := false;
+  begin
+    perform public.import_official_deceased(jsonb_build_array(
+      jsonb_build_object(
+        'source_row', '301',
+        'full_name', 'Persona Ficticia Colision Uno SQL',
+        'source_name', 'Medicina Legal',
+        'source_reference', 'Lista oficial ficticia con colision'
+      ),
+      jsonb_build_object(
+        'source_row', '301',
+        'full_name', 'Persona Ficticia Colision Dos SQL',
+        'source_name', 'Medicina Legal',
+        'source_reference', 'Lista oficial ficticia con colision'
+      )
+    ), 'Prueba ficticia de colision de referencia y fila');
+  exception when sqlstate 'P0003' then
+    v_failed := true;
+  end;
+  if not v_failed or exists (
+    select 1 from public.people
+    where normalized_name in (
+      public.normalize_person_name('Persona Ficticia Colision Uno SQL'),
+      public.normalize_person_name('Persona Ficticia Colision Dos SQL')
+    )
+  ) then
+    raise exception 'Duplicate composite official source key was not blocked atomically';
+  end if;
+
+  v_failed := false;
+  begin
+    perform public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
+      'source_row', '302',
+      'reported_unit', 'Unidad 300 123 4567',
+      'full_name', 'Persona Ficticia Unidad Insegura SQL',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Lista oficial ficticia unidad insegura'
+    )));
+  exception when sqlstate '22023' then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'Official preview accepted contact information in reported_unit';
+  end if;
+
+  -- A normalized-name match is never enough to declare an existing missing
+  -- person deceased. Homonyms and conflicting biographical data require an
+  -- explicit manual resolution outside the bulk importer.
   insert into public.people (
     full_name, normalized_name, approximate_age, is_minor, gender, is_test_data
   ) values (
@@ -1019,68 +1210,180 @@ begin
 
   insert into public.cases (
     person_id, slug, publication_status, condition_status,
-    verification_level, urgency_level
+    verification_level, urgency_level, authority_reference_private
   ) values (
     v_existing_person_id, 'persona-ficticia-existente-sql', 'published',
-    'missing', 'moderator_reviewed', 'normal'
+    'missing', 'moderator_reviewed', 'normal',
+    'Referencia-oficial-ficticia-existente'
   ) returning id into v_existing_case_id;
 
-  v_result := public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+  v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
     'full_name', 'Persona Ficticia Existente SQL',
-    'approximate_age', '52',
+    'approximate_age', '81',
+    'source_row', '64',
+    'reported_unit', 'Unidad ficticia de otra persona',
     'gender', 'Este campo fuera del contrato debe ignorarse',
     'source_name', 'Medicina Legal',
     'source_reference', 'Referencia-oficial-ficticia-existente',
     'date_confirmed', ''
-  )), 'Transición ficticia auditada de caso existente');
-  if (v_result ->> 'updated')::integer <> 1 then
-    raise exception 'Existing missing case was not updated by official import';
+  )));
+  if v_result #>> '{0,decision}' <> 'review_required'
+    or v_result #>> '{0,reviewReason}' <> 'existing_normalized_name_requires_manual_review' then
+    raise exception 'Name-only official match was not routed to manual review';
+  end if;
+
+  select count(*) into v_count_before
+  from public.audit_logs
+  where entity_id = v_existing_case_id;
+  v_failed := false;
+  begin
+    perform public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+      'full_name', 'Persona Ficticia Existente SQL',
+      'approximate_age', '81',
+      'source_row', '64',
+      'reported_unit', 'Unidad ficticia de otra persona',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Referencia-oficial-ficticia-existente',
+      'date_confirmed', ''
+    )), 'Intento ficticio de coincidencia insegura solo por nombre');
+  exception when sqlstate 'P0003' then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'Name-only official match was imported automatically';
   end if;
   if not exists (
-    select 1 from public.status_history
-    where case_id = v_existing_case_id
-      and previous_condition = 'missing'
-      and new_condition = 'deceased_confirmed'
-      and previous_verification = 'moderator_reviewed'
-      and new_verification = 'authority_confirmed'
-      and actor_id = v_admin
+    select 1 from public.cases
+    where id = v_existing_case_id
+      and condition_status = 'missing'
+      and verification_level = 'moderator_reviewed'
+      and authority_reference_private = 'Referencia-oficial-ficticia-existente'
+      and reported_unit is null
   ) then
-    raise exception 'Existing missing -> deceased transition history is missing';
+    raise exception 'Blocked name-only match changed the existing case';
   end if;
-  if not exists (
-    select 1 from public.moderation_actions
-    where case_id = v_existing_case_id
-      and action = 'official_deceased_import'
-      and actor_id = v_admin
-  ) or not exists (
-    select 1 from public.audit_logs
-    where entity_id = v_existing_case_id
-      and action = 'official_deceased_imported'
-      and actor_id = v_admin
-  ) then
-    raise exception 'Existing-case official import moderation or audit is missing';
+  if (select approximate_age from public.people where id = v_existing_person_id) <> 52
+    or (select gender from public.people where id = v_existing_person_id) <> 'Valor previo preservado'
+    or exists (
+      select 1 from public.official_deceased_import_entries
+      where case_id = v_existing_case_id
+    )
+    or (select count(*) from public.audit_logs where entity_id = v_existing_case_id) <> v_count_before
+    or exists (
+      select 1 from public.moderation_actions
+      where case_id = v_existing_case_id and action = 'official_deceased_import'
+    ) then
+    raise exception 'Blocked name-only match mutated person, ledger, moderation or audit data';
   end if;
-  if (select resolved_at from public.cases where id = v_existing_case_id) is not null then
-    raise exception 'Empty date_confirmed invented a resolution timestamp';
+
+  -- A legacy reference/name match cannot be treated as an idempotent replay
+  -- while the existing case is still missing and not authority-confirmed.
+  v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Existente SQL',
+    'approximate_age', '52',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-existente',
+    'date_confirmed', ''
+  )));
+  if v_result #>> '{0,decision}' <> 'review_required'
+    or v_result #>> '{0,reviewReason}' <> 'source_reference_existing_case_not_authority_confirmed' then
+    raise exception 'Unsafe legacy reference replay was not routed to manual review';
   end if;
-  if (select gender from public.people where id = v_existing_person_id) <> 'Valor previo preservado' then
-    raise exception 'Out-of-contract gender input changed the person';
+  v_failed := false;
+  begin
+    perform public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+      'full_name', 'Persona Ficticia Existente SQL',
+      'approximate_age', '52',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Referencia-oficial-ficticia-existente',
+      'date_confirmed', ''
+    )), 'Intento ficticio de replay legacy sobre caso no confirmado');
+  exception when sqlstate 'P0003' then
+    v_failed := true;
+  end;
+  if not v_failed
+    or not exists (
+      select 1 from public.cases
+      where id = v_existing_case_id
+        and condition_status = 'missing'
+        and verification_level = 'moderator_reviewed'
+        and public_source_label is null
+    )
+    or (select count(*) from public.audit_logs where entity_id = v_existing_case_id) <> v_count_before then
+    raise exception 'Unsafe legacy reference replay changed or skipped the missing case';
+  end if;
+
+  -- Legacy seven-column callers remain supported. A new exact authority
+  -- reference creates once; the same reference and normalized name then skips.
+  v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Legacy SQL',
+    'approximate_age', '73',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-legacy',
+    'public_description', 'Registro ficticio legacy dentro de rollback.',
+    'last_seen_location_public', 'Unidad ficticia legacy',
+    'date_confirmed', ''
+  )));
+  if v_result #>> '{0,decision}' <> 'create' then
+    raise exception 'Legacy seven-column preview cannot create a new official row';
+  end if;
+  v_result := public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Legacy SQL',
+    'approximate_age', '73',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-legacy',
+    'public_description', 'Registro ficticio legacy dentro de rollback.',
+    'last_seen_location_public', 'Unidad ficticia legacy',
+    'date_confirmed', ''
+  )), 'Prueba ficticia compatible con importador web legacy');
+  if (v_result ->> 'created')::integer <> 1 then
+    raise exception 'Legacy seven-column official import did not create one row';
+  end if;
+  v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Legacy SQL',
+    'approximate_age', '99',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-legacy',
+    'public_description', 'Contenido distinto ignorado por compatibilidad legacy.',
+    'last_seen_location_public', 'Otra unidad ficticia legacy',
+    'date_confirmed', ''
+  )));
+  if v_result #>> '{0,decision}' <> 'already_imported' then
+    raise exception 'Exact legacy authority reference and name were not recognized safely';
+  end if;
+  v_result := public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Legacy SQL',
+    'approximate_age', '99',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-legacy',
+    'public_description', 'Contenido distinto ignorado por compatibilidad legacy.',
+    'last_seen_location_public', 'Otra unidad ficticia legacy',
+    'date_confirmed', ''
+  )), 'Reintento ficticio compatible con importador web legacy');
+  if (v_result ->> 'skipped')::integer <> 1 then
+    raise exception 'Legacy exact-reference replay was not skipped';
   end if;
 
   v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
     'full_name', 'Persona Ficticia Oficial SQL',
     'approximate_age', '41',
+    'source_row', '65',
+    'reported_unit', 'Pereira',
     'source_name', 'Medicina Legal',
     'source_reference', 'Referencia-oficial-ficticia-001'
   )));
   if v_result #>> '{0,decision}' <> 'create'
-    or v_result #>> '{0,sourceName}' <> 'Medicina Legal' then
+    or v_result #>> '{0,sourceName}' <> 'Medicina Legal'
+    or v_result #>> '{0,sourceRow}' <> '65'
+    or v_result #>> '{0,reportedUnit}' <> 'Pereira' then
     raise exception 'Valid official import preview is incorrect';
   end if;
 
   v_result := public.import_official_deceased(jsonb_build_array(jsonb_build_object(
     'full_name', 'Persona Ficticia Oficial SQL',
     'approximate_age', '41',
+    'source_row', '65',
+    'reported_unit', 'Pereira',
     'gender', '',
     'source_name', 'Medicina Legal',
     'source_reference', 'Referencia-oficial-ficticia-001',
@@ -1104,7 +1407,8 @@ begin
       and publication_status = 'published'
       and urgency_level = 'normal'
       and public_source_label = 'Medicina Legal'
-      and authority_reference_private = 'Medicina Legal — Referencia-oficial-ficticia-001'
+      and reported_unit = 'Pereira'
+      and authority_reference_private = 'Referencia-oficial-ficticia-001'
       and resolved_at is null
       and primary_public_photo_path is null
   ) then
@@ -1125,17 +1429,50 @@ begin
   ) then
     raise exception 'Official moderation action is missing';
   end if;
+  if not exists (
+    select 1
+    from public.official_deceased_import_entries
+    where case_id = v_official_case_id
+      and source_reference = 'Referencia-oficial-ficticia-001'
+      and source_row = 65
+      and payload_fingerprint ~ '^[0-9a-f]{64}$'
+      and imported_by = v_admin
+  ) then
+    raise exception 'Official source-row ledger entry is missing';
+  end if;
+  if has_function_privilege(
+      'anon',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    )
+    or has_function_privilege(
+      'authenticated',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    )
+    or has_function_privilege(
+      'service_role',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    ) then
+    raise exception 'Public or service role can execute the private import fingerprint helper';
+  end if;
 
   select count(*) into v_count_before
   from public.audit_logs
   where entity_id = v_official_case_id and action = 'official_deceased_imported';
 
+  -- Only a canonically identical payload is an idempotent replay.
   v_result := public.import_official_deceased(jsonb_build_array(jsonb_build_object(
     'full_name', 'Persona Ficticia Oficial SQL',
     'approximate_age', '41',
+    'source_row', '65',
+    'reported_unit', 'Pereira',
     'source_name', 'Medicina Legal',
     'source_reference', 'Referencia-oficial-ficticia-001',
-    'public_description', 'Este texto no debe volver a aplicarse.'
+    'public_description', 'Registro ficticio usado solo dentro de una transacción con rollback.',
+    'last_seen_location_public', 'Lugar público ficticio',
+    'date_confirmed', ''
   )), 'Reintento ficticio idempotente de la misma fuente oficial');
   if (v_result ->> 'skipped')::integer <> 1
     or (v_result ->> 'created')::integer <> 0
@@ -1145,10 +1482,117 @@ begin
     raise exception 'Official import replay was not skipped without a new audit event';
   end if;
 
+  -- Every persisted source-row field participates in the canonical payload
+  -- fingerprint; changing any one of them must produce a different identity.
+  if public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    ) = public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 42, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    )
+    or public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    ) = public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Cali',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    )
+    or public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    ) = public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'DescripciÃ³n ficticia distinta.', 'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    )
+    or public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    ) = public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Otro lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    )
+    or public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', null,
+      'Referencia-oficial-ficticia-001', 65
+    ) = public.official_deceased_import_fingerprint(
+      'Persona Ficticia Oficial SQL', 41, 'Pereira',
+      'Registro ficticio usado solo dentro de una transacciÃ³n con rollback.',
+      'Lugar pÃºblico ficticio', '2026-08-12',
+      'Referencia-oficial-ficticia-001', 65
+    ) then
+    raise exception 'A persisted source-row field is missing from the payload fingerprint';
+  end if;
+
+  -- Reusing the same source reference/row/name with changed content is not a
+  -- replay. It must stop for review and leave all persisted data untouched.
+  v_result := public.preview_official_deceased_import(jsonb_build_array(jsonb_build_object(
+    'full_name', 'Persona Ficticia Oficial SQL',
+    'approximate_age', '42',
+    'source_row', '65',
+    'reported_unit', 'Unidad ficticia modificada',
+    'source_name', 'Medicina Legal',
+    'source_reference', 'Referencia-oficial-ficticia-001',
+    'public_description', 'Texto ficticio modificado que requiere revisión.',
+    'last_seen_location_public', 'Otro lugar público ficticio',
+    'date_confirmed', ''
+  )));
+  if v_result #>> '{0,decision}' <> 'review_required'
+    or v_result #>> '{0,reviewReason}' <> 'source_reference_row_payload_changed' then
+    raise exception 'Changed composite replay was not routed to manual review';
+  end if;
+  v_failed := false;
+  begin
+    perform public.import_official_deceased(jsonb_build_array(jsonb_build_object(
+      'full_name', 'Persona Ficticia Oficial SQL',
+      'approximate_age', '42',
+      'source_row', '65',
+      'reported_unit', 'Unidad ficticia modificada',
+      'source_name', 'Medicina Legal',
+      'source_reference', 'Referencia-oficial-ficticia-001',
+      'public_description', 'Texto ficticio modificado que requiere revisión.',
+      'last_seen_location_public', 'Otro lugar público ficticio',
+      'date_confirmed', ''
+    )), 'Intento ficticio de replay compuesto con contenido modificado');
+  exception when sqlstate 'P0003' then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'Changed composite replay was imported';
+  end if;
+  if (select reported_unit from public.cases where id = v_official_case_id) <> 'Pereira' then
+    raise exception 'Blocked changed replay mutated reported_unit';
+  end if;
+  if (select approximate_age from public.people where id = (
+      select person_id from public.cases where id = v_official_case_id
+    )) <> 41
+    or (select count(*) from public.audit_logs
+        where entity_id = v_official_case_id and action = 'official_deceased_imported') <> v_count_before then
+    raise exception 'Blocked changed replay mutated person data or audit history';
+  end if;
+
   v_failed := false;
   begin
     perform public.import_official_deceased(jsonb_build_array(jsonb_build_object(
       'full_name', 'Otra Persona Ficticia Conflicto SQL',
+      'source_row', '65',
       'source_name', 'Medicina Legal',
       'source_reference', 'Referencia-oficial-ficticia-001'
     )), 'Validación ficticia de referencia ya asignada a otra persona');
@@ -1166,12 +1610,38 @@ begin
   from public.public_case_cards card where id = v_official_case_id;
   if v_public ->> 'public_source_label' <> 'Medicina Legal'
     or v_public ->> 'condition_status' <> 'deceased_confirmed'
-    or v_public ->> 'verification_level' <> 'authority_confirmed' then
+    or v_public ->> 'verification_level' <> 'authority_confirmed'
+    or v_public ->> 'reported_unit' <> 'Pereira' then
     raise exception 'Official public card attribution is incorrect';
   end if;
   if v_public::text like '%Referencia-oficial-ficticia-001%'
     or v_public::text like '%authority_reference_private%' then
     raise exception 'Official private reference leaked publicly';
+  end if;
+  select to_jsonb(public_case) into v_public
+  from public.get_public_case((
+    select slug from public.cases where id = v_official_case_id
+  )) public_case;
+  if v_public ->> 'reported_unit' <> 'Pereira'
+    or v_public ? 'gender'
+    or v_public ? 'source_reference'
+    or v_public ? 'authority_reference_private'
+    or v_public::text like '%Referencia-oficial-ficticia-001%'
+    or v_public::text like '%3000000000%' then
+    raise exception 'get_public_case leaked private official or contact data';
+  end if;
+  select to_jsonb(public_case) into v_public
+  from public.search_public_people(
+    'Persona Ficticia Oficial SQL', 'deceased_confirmed', null, null, 24, 0
+  ) public_case
+  where id = v_official_case_id;
+  if v_public ->> 'reported_unit' <> 'Pereira'
+    or v_public ->> 'condition_status' <> 'deceased_confirmed'
+    or v_public ->> 'verification_level' <> 'authority_confirmed'
+    or v_public ? 'gender'
+    or v_public ? 'source_reference'
+    or v_public::text like '%Referencia-oficial-ficticia-001%' then
+    raise exception 'search_public_people official projection is unsafe or incomplete';
   end if;
 
   -- Database ACL/RLS contracts are tested independently from application code.
@@ -1187,6 +1657,18 @@ begin
   end if;
   if not (select relrowsecurity from pg_class where oid = 'public.contact_followups'::regclass) then
     raise exception 'contact_followups RLS is not enabled';
+  end if;
+  if not (select relrowsecurity from pg_class where oid = 'public.official_deceased_import_entries'::regclass)
+    or not (select relforcerowsecurity from pg_class where oid = 'public.official_deceased_import_entries'::regclass) then
+    raise exception 'Official import ledger RLS is not enabled and forced';
+  end if;
+  if has_table_privilege('anon', 'public.official_deceased_import_entries', 'SELECT')
+    or has_table_privilege('anon', 'public.official_deceased_import_entries', 'INSERT')
+    or has_table_privilege('authenticated', 'public.official_deceased_import_entries', 'SELECT')
+    or has_table_privilege('authenticated', 'public.official_deceased_import_entries', 'INSERT')
+    or has_table_privilege('authenticated', 'public.official_deceased_import_entries', 'UPDATE')
+    or has_table_privilege('authenticated', 'public.official_deceased_import_entries', 'DELETE') then
+    raise exception 'A public role has direct access to the official import ledger';
   end if;
   if has_table_privilege('anon', 'public.contact_followups', 'SELECT')
     or has_table_privilege('anon', 'public.contact_followups', 'INSERT')
@@ -1205,6 +1687,21 @@ begin
     or has_function_privilege('anon', 'public.review_pending_person_case(uuid,text,text,text,text,uuid,text,text)', 'EXECUTE')
     or has_function_privilege('anon', 'public.log_contact_followup(uuid,uuid,uuid,text,text,text,text,timestamp with time zone)', 'EXECUTE') then
     raise exception 'Anon can execute a staff-only RPC';
+  end if;
+  if has_function_privilege(
+      'anon',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'service_role',
+      'public.official_deceased_import_fingerprint(text,integer,text,text,text,text,text,integer)',
+      'EXECUTE'
+    ) then
+    raise exception 'A client role can execute the private official fingerprint helper';
   end if;
   if has_function_privilege('anon', 'public.bootstrap_initial_admin(uuid,text,text)', 'EXECUTE')
     or has_function_privilege('authenticated', 'public.bootstrap_initial_admin(uuid,text,text)', 'EXECUTE')
@@ -1270,19 +1767,53 @@ begin
       and column_name in (
         'phone', 'email', 'reporter_name', 'contact_id', 'reporter_contacts',
         'location_private', 'authority_reference_private', 'private_path',
-        'report_context'
+        'report_context', 'gender', 'source_reference', 'source_row',
+        'payload_fingerprint', 'imported_by'
       )
   ) then
     raise exception 'Private columns leaked into public projection';
+  end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'public_case_cards'
+      and column_name = 'reported_unit'
+  ) then
+    raise exception 'Safe reported_unit is absent from the public projection';
   end if;
   if (select public_source_label from public.public_case_cards where id = v_case_id) is not null then
     raise exception 'Unverified missing case received a public authority label';
   end if;
 
   v_result := public.reports_debug_snapshot();
-  if v_result ->> 'schemaVersion' <> '202608130001'
+  if v_result ->> 'schemaVersion' <> '202608130002'
+    or v_result ->> 'lastMigrationApplied' <> '202608130002'
+    or coalesce((v_result ->> 'deceasedFilterReady')::boolean, false) is not true
+    or (v_result #>> '{publishedCounts,missing}')::bigint <> (
+      select count(*)
+      from public.cases c
+      join public.people p on p.id = c.person_id
+      where c.publication_status = 'published'
+        and c.condition_status = 'missing'
+        and c.deleted_at is null
+        and p.is_test_data = false
+    )
+    or (v_result #>> '{publishedCounts,deceasedConfirmed}')::bigint <> (
+      select count(*)
+      from public.cases c
+      join public.people p on p.id = c.person_id
+      where c.publication_status = 'published'
+        and c.condition_status = 'deceased_confirmed'
+        and c.verification_level = 'authority_confirmed'
+        and c.deleted_at is null
+        and p.is_test_data = false
+    )
     or not (v_result -> 'tables' @> jsonb_build_array(jsonb_build_object(
       'name', 'contact_followups', 'found', true
+    )))
+    or not (v_result -> 'tables' @> jsonb_build_array(jsonb_build_object(
+      'name', 'official_deceased_import_entries', 'found', true,
+      'rlsEnabled', true, 'rlsForced', true
     )))
     or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
       'name', 'review_pending_person_case', 'found', true

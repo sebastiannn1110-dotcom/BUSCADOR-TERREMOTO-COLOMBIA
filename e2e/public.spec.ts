@@ -34,6 +34,14 @@ test("los recursos sintéticos de demo no forman parte del sitio público", asyn
   expect(response.status()).toBe(404);
 });
 
+test("fallecidos responde y ofrece búsqueda pública por nombre", async ({ page }) => {
+  const response = await page.goto("/fallecidos");
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Fallecidos confirmados" })).toBeVisible();
+  await expect(page.getByPlaceholder("Buscar por nombre")).toBeVisible();
+  await expect(page.getByText(/Personas identificadas oficialmente/)).toBeVisible();
+});
+
 test("la búsqueda usa resultados públicos simulados sin fixtures runtime", async ({ page }) => {
   await page.route("**/api/search?**", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [fictionalPublicCase] }) });
@@ -55,8 +63,11 @@ test("los filtros visibles construyen URLs con estado", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Todos" })).toHaveAttribute("href", "/buscar");
   await expect(page.getByRole("link", { name: "Desaparecidos" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("href", "/buscar?estado=deceased_confirmed");
-  await expect(page.getByRole("link", { name: "Localizados" })).toHaveAttribute("href", "/buscar?estado=located_alive");
-  await expect(page.getByRole("link", { name: "Reunidos" })).toHaveAttribute("href", "/buscar?estado=reunited");
+  await expect(page.getByRole("link", { name: "Localizados" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reunidos" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Fallecidos confirmados" }).click();
+  await expect(page).toHaveURL(/\/buscar\?estado=deceased_confirmed$/);
+  await expect(page.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("aria-current", "page");
 });
 
 test("el reporte público simplificado conserva foto opcional y tres pasos", async ({ page }) => {
@@ -87,9 +98,15 @@ test("el reporte público simplificado conserva foto opcional y tres pasos", asy
   await expect(page.getByText(/Relación con la persona/i)).toHaveCount(0);
 });
 
-test("la confirmación distingue información recibida", async ({ page }) => {
-  await page.goto("/reporte/confirmacion/EN-FICTICIO-123?tipo=informacion");
-  await expect(page.getByRole("heading", { name: "Información recibida" })).toBeVisible();
-  await expect(page.getByText(/Será revisada por el equipo antes de mostrarse públicamente/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copiar enlace" })).toBeVisible();
+test("la confirmación pública no expone tracking ni enlaces internos", async ({ page }) => {
+  await page.goto("/reporte/confirmacion/EN-FICTICIO-123");
+  await expect(page).toHaveURL(/\/reporte\/confirmacion$/);
+  await expect(page.getByRole("heading", { name: "Reporte recibido" })).toBeVisible();
+  await expect(page.getByText(/Si el equipo necesita más información/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Reportar otra persona" })).toHaveAttribute("href", "/reportar-desaparecido");
+  await expect(page.locator("main")).not.toContainText("EN-FICTICIO-123");
+  await expect(page.locator("main")).not.toContainText("localhost");
+  await expect(page.getByText("Copiar enlace", { exact: true })).toHaveCount(0);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });

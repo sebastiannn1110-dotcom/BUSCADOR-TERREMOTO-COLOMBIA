@@ -7,6 +7,8 @@ import { StatusBadge, VerificationBadge } from "./status-badge";
 
 export function CaseCard({ item }: { item: CaseCardType }) {
   const deceased = item.condition_status === "deceased_confirmed";
+  const medicinaLegal = item.public_source_label?.trim().toLocaleLowerCase("es") === "medicina legal";
+  const reportedPlace = item.reported_unit || item.last_seen_location_public;
   const sightingCount = item.approved_sightings_count ?? item.approved_reports_count;
   const showTestLabel = process.env.NODE_ENV !== "production" && item.is_test_data;
 
@@ -20,20 +22,29 @@ export function CaseCard({ item }: { item: CaseCardType }) {
       <div className="card-body">
         {showTestLabel && <p className="test-label">DATOS DE PRUEBA</p>}
         <h3>{item.full_name}</h3>
-        {item.approximate_age !== null && <p>{item.approximate_age} años aproximados</p>}
+        {item.approximate_age !== null && (deceased
+          ? <p><strong>Edad:</strong> {item.approximate_age} años</p>
+          : <p>{item.approximate_age} años aproximados</p>)}
         <StatusBadge
           status={item.condition_status}
           verificationLevel={item.verification_level}
           publicSourceLabel={item.public_source_label}
         />
         <VerificationBadge level={item.verification_level} />
-        <dl>
-          <div><dt>Último lugar conocido</dt><dd>{item.last_seen_location_public || "No informado"}</dd></div>
-          <div><dt>Última actualización</dt><dd>{formatDate(item.updated_at)}</dd></div>
-          <div><dt>Posibles avistamientos revisados</dt><dd>{sightingCount}</dd></div>
-          {item.latest_approved_sighting_location
-            && <div><dt>Último posible avistamiento</dt><dd>{item.latest_approved_sighting_location}</dd></div>}
-        </dl>
+        {deceased
+          ? <>
+            <dl>
+              <div><dt>Unidad básica / lugar reportado</dt><dd>{reportedPlace || "No informado"}</dd></div>
+            </dl>
+            {medicinaLegal && <p>Información tomada de las listas de Medicina Legal</p>}
+          </>
+          : <dl>
+            <div><dt>Último lugar conocido</dt><dd>{item.last_seen_location_public || "No informado"}</dd></div>
+            <div><dt>Última actualización</dt><dd>{formatDate(item.updated_at)}</dd></div>
+            <div><dt>Posibles avistamientos revisados</dt><dd>{sightingCount}</dd></div>
+            {item.latest_approved_sighting_location
+              && <div><dt>Último posible avistamiento</dt><dd>{item.latest_approved_sighting_location}</dd></div>}
+          </dl>}
       </div>
     </Link>
     <div className="card-actions">

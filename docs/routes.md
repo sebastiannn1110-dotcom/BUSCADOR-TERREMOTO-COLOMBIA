@@ -5,14 +5,15 @@
 | Ruta | Uso |
 | --- | --- |
 | `/` | Inicio, búsqueda, acceso a desaparecidos y fallecidos confirmados. |
-| `/buscar` | Catálogo paginado y filtros de casos publicados (`pagina` conserva el filtro). |
+| `/buscar` | Catálogo paginado de casos publicados; filtros visibles: `Todos`, `Desaparecidos` y `Fallecidos confirmados` (`pagina` conserva el filtro). |
 | `/buscar/ia` | Ayuda conversacional opcional; las cards siguen proviniendo de la búsqueda pública. |
-| `/fallecidos` | Listado paginado de casos publicados con `deceased_confirmed` y `authority_confirmed`. |
+| `/fallecidos` | Buscador y listado paginado, desde Supabase, exclusivamente de casos `published` + `deceased_confirmed` + `authority_confirmed`. Las cards muestran la fuente pública segura y `Unidad básica / lugar reportado`, sin afirmar que sea el lugar de muerte. |
 | `/reportar-desaparecido` | Formulario público simplificado para reportar una persona. |
 | `/reportar` | Alias que redirige a `/reportar-desaparecido`. |
 | `/persona/[slug]` | Ficha pública y avistamientos aprobados. |
 | `/persona/[slug]/informacion` | Envío privado de avistamientos, correcciones u otra información. |
-| `/reporte/confirmacion/[trackingCode]` | Recibo con código y URL copiable. No consulta el estado en base de datos. |
+| `/reporte/confirmacion` | Confirmación pública genérica del envío. No recibe ni muestra el tracking, ofrece solo volver al inicio o reportar otra persona y declara `noindex, nofollow`. No consulta el estado en base de datos. |
+| `/reporte/confirmacion/[trackingCode]` | Compatibilidad heredada: valida el formato y redirige a `/reporte/confirmacion`, de modo que el código también desaparece de la barra de direcciones. |
 | `/privacidad` | Resumen público de privacidad. |
 | `/correccion` | Instrucciones para solicitar una corrección. |
 | `/retiro` | Instrucciones para solicitar retiro mediante reporte privado. |
@@ -38,17 +39,17 @@ Las páginas públicas solo consultan el contrato permitido: `public_case_cards`
 
 | Ruta | Método | Uso |
 | --- | --- | --- |
-| `/api/health` | `GET` | Presencia de configuración básica; no sustituye la verificación de esquema. |
+| `/api/health` | `GET` | Estado sin secretos: configuración, alcance a la base, `schemaVersion`, disponibilidad del filtro de fallecidos y validez de `APP_URL`. |
 | `/api/search` | `GET` | Búsqueda exclusiva de casos publicados. |
 | `/api/ai-search` | `POST` | Interpretación opcional y búsqueda pública. |
 | `/api/reports` | `POST` | Nuevos casos e información privada. |
-| `/api/debug/reports` | `GET` | Diagnóstico temporal protegido por `x-debug-token`. |
+| `/api/debug/reports` | `GET` | Diagnóstico temporal protegido por `x-debug-token`: esquema/RLS/RPCs/buckets, última migración, conteos públicos agregados y preparación del filtro de fallecidos. |
 | `/api/admin/pending-people` | `GET`, `POST` | Cola y revisión de personas pendientes. |
 | `/api/admin/sightings` | `GET`, `POST` | Cola y moderación de reportes. |
 | `/api/admin/contact-followups` | `GET`, `POST` | Cola y altas append-only de seguimiento. |
 | `/api/admin/private-media/[assetId]` | `GET` | Acceso autenticado y auditado a evidencia privada. |
 | `/api/admin/import-deceased` | `POST` | Modos `preview` y `confirm` del importador oficial. |
 
-Las respuestas administrativas con datos sensibles usan `Cache-Control: private, no-store`.
+Las respuestas administrativas con datos sensibles usan `Cache-Control: private, no-store`. Los conteos del diagnóstico son agregados y solo consideran registros públicos válidos; nunca devuelve nombres, referencias privadas, contactos ni filas del importador.
 
 Consulta el mapa completo en [PROJECT_CONTEXT_COMPLETE.md](PROJECT_CONTEXT_COMPLETE.md#rutas-y-roles).

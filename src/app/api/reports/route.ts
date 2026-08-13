@@ -95,9 +95,9 @@ async function readRequest(request: NextRequest) {
 }
 
 async function verifyCaptcha(token: string | undefined, request: NextRequest) {
-  const provider = process.env.CAPTCHA_PROVIDER;
-  const secret = process.env.CAPTCHA_SECRET_KEY;
-  const siteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY;
+  const provider = process.env.CAPTCHA_PROVIDER?.trim().toLowerCase();
+  const secret = process.env.CAPTCHA_SECRET_KEY?.trim();
+  const siteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY?.trim();
   if (!provider || !secret || !siteKey) return "skipped" as const;
   if (provider !== "turnstile") return "unconfigured" as const;
   if (!token) return "invalid" as const;
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     }
     if (parsed.data.website) {
       reportsLog("info", "Honeypot submission discarded", { requestId });
-      return NextResponse.json({ trackingCode: "RECIBIDO" });
+      return NextResponse.json({ received: true });
     }
 
     reportsLog("info", "Verifying CAPTCHA", { requestId });
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
     }
     uploadedPath = null;
     reportsLog("info", "Finished successfully", { requestId, trackingCode });
-    return NextResponse.json({ trackingCode }, { status: 201 });
+    return NextResponse.json({ received: true }, { status: 201 });
   } catch (error) {
     if (error instanceof RequestProblem) {
       reportsLog("info", "Request rejected", { requestId, status: error.status, error: reportError(error) });

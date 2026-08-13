@@ -9,9 +9,7 @@ import type { CaseCard as Item } from "@/lib/types";
 const filters = [
   { value: "", label: "Todos" },
   { value: "missing", label: "Desaparecidos" },
-  { value: "deceased_confirmed", label: "Fallecidos confirmados" },
-  { value: "located_alive", label: "Localizados" },
-  { value: "reunited", label: "Reunidos" }
+  { value: "deceased_confirmed", label: "Fallecidos confirmados" }
 ] as const;
 
 export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }: { initialQuery: string; initialStatus: string; initialPage?: string }) {
@@ -21,13 +19,14 @@ export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }
   const [hasMore, setHasMore] = useState(false);
   const parsedPage = Number(initialPage);
   const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const activeStatus = filters.find((filter) => filter.value === initialStatus)?.value ?? "";
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
     const parameters = new URLSearchParams({ q: initialQuery });
-    if (initialStatus) parameters.set("estado", initialStatus);
+    if (activeStatus) parameters.set("estado", activeStatus);
     if (page > 1) parameters.set("pagina", String(page));
     fetch(`/api/search?${parameters.toString()}`, { signal: controller.signal })
       .then(async (response) => {
@@ -46,7 +45,7 @@ export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [initialQuery, initialStatus, page]);
+  }, [initialQuery, activeStatus, page]);
 
   function filterHref(status: string) {
     const parameters = new URLSearchParams();
@@ -59,7 +58,7 @@ export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }
   function pageHref(nextPage: number) {
     const parameters = new URLSearchParams();
     if (initialQuery) parameters.set("q", initialQuery);
-    if (initialStatus) parameters.set("estado", initialStatus);
+    if (activeStatus) parameters.set("estado", activeStatus);
     if (nextPage > 1) parameters.set("pagina", String(nextPage));
     const query = parameters.toString();
     return `/buscar${query ? `?${query}` : ""}`;
@@ -73,8 +72,8 @@ export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }
       {filters.map((filter) => <Link
         key={filter.value || "all"}
         href={filterHref(filter.value)}
-        className={initialStatus === filter.value ? "active" : ""}
-        aria-current={initialStatus === filter.value ? "page" : undefined}
+        className={activeStatus === filter.value ? "active" : ""}
+        aria-current={activeStatus === filter.value ? "page" : undefined}
       >{filter.label}</Link>)}
     </nav>
     <p className="results-count" aria-live="polite">{loading ? "Buscando casos…" : `${results.length} coincidencia${results.length === 1 ? "" : "s"}`}</p>
