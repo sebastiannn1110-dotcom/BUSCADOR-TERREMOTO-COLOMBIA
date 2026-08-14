@@ -66,6 +66,7 @@ describe("inspector seguro del contrato de producción", () => {
         { name: "get_admin_people_cases", found: true },
         { name: "withdraw_person_case", found: true },
         { name: "get_admin_case_message_threads", found: true },
+        { name: "apply_deceased_memorial_portrait", found: true },
       ],
       buckets: Object.entries(inspector.expectedBucketContracts).map(([name, contract]) => ({
         name,

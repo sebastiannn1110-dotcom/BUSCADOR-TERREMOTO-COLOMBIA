@@ -43,4 +43,4 @@ Los checks impiden `deceased_confirmed` sin `authority_confirmed`, razón y refe
 
 ## Migraciones
 
-La versión esperada es `202608130003` y requiere siete archivos, en orden. La migración más reciente añade el retiro lógico auditado de cards publicadas, el listado administrativo y los hilos privados de mensajes por caso. El código no prueba que estén aplicados en producción; valida `supabase_migrations.schema_migrations`, RLS, grants, RPCs, conteos agregados y buckets antes de desplegar.
+La versión esperada es `202608130004` y requiere ocho archivos, en orden. La migración más reciente añade un vínculo conmemorativo auditado por caso fallecido y hace que la proyección pública lo prefiera sin modificar estados ni referencias de autoridad. El diagnóstico valida `supabase_migrations.schema_migrations`, RLS, grants, RPCs, conteos agregados y buckets.

@@ -74,4 +74,4 @@ Los reportes de posible atrapamiento o posible fallecimiento exigen contacto y s
 
 ## Responsabilidades operativas pendientes
 
-Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las siete migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.
+Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las ocho migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.

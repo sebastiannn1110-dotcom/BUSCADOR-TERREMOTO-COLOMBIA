@@ -4,7 +4,7 @@
 
 **Línea base auditada antes de esta actualización:** `cd0cb7c41b13bd10ad5df67354727e278dfe6035`
 
-**Estado verificado el 13 de agosto de 2026:** migración `202608130003` aplicada en producción; importación oficial auditada de 142 filas completada; snapshot, RLS, buckets, pruebas SQL, lint, typecheck, 146 pruebas unitarias, build y 7 E2E aprobados. El hash del código desplegado se contrasta por separado en la entrega.
+**Estado verificado el 13 de agosto de 2026:** migración `202608130004` aplicada en producción; importación oficial auditada de 142 filas completada; las 142 cards de fallecidos tienen vínculo conmemorativo auditado; snapshot, RLS, buckets, pruebas SQL, lint, typecheck y build aprobados. El hash del código desplegado se contrasta por separado en la entrega.
 
 Este documento describe lo que existe en el repositorio. No afirma que la migración más reciente, los buckets, las variables ni el commit candidato estén presentes en producción sin una comprobación independiente.
 
@@ -307,8 +307,9 @@ RLS protege tablas privadas. Las migraciones 005 y 006 revocan DML directo y fue
 | 5 | `202608130001_production_review_and_contact_followups.sql` | Revisión de personas, followups, retratos públicos sanitizados, contrato público endurecido, roles/permisos e importador idempotente. |
 | 6 | `202608130002_official_deceased_capture_and_diagnostics.sql` | `reported_unit`, bitácora privada por referencia/fila, RPCs compatibles con ambos importadores y diagnóstico/conteos agregados. |
 | 7 | `202608130003_admin_case_withdrawal_and_message_threads.sql` | Retiro lógico auditado, gestión de publicadas, hilos privados por caso y diagnóstico `202608130003`. |
+| 8 | `202608130004_deceased_memorial_portrait.sql` | Imagen conmemorativa compartida,  vínculo auditado por caso fallecido y diagnóstico `202608130004`, sin cambiar estados. |
 
-La versión esperada por `reports_debug_snapshot` es `202608130003`. Hay que contrastar `lastMigrationApplied`, `schemaVersion`, `publishedCounts`, `deceasedFilterReady`, tablas, RLS, RPCs y buckets en cada liberación.
+La versión esperada por `reports_debug_snapshot` es `202608130004`. Hay que contrastar `lastMigrationApplied`, `schemaVersion`, `publishedCounts`, `deceasedFilterReady`, tablas, RLS, RPCs y buckets en cada liberación.
 
 ## RPCs vigentes
 
@@ -441,8 +442,8 @@ Los casos se marcan `is_test_data=true` y la vista pública vigente los excluye.
 
 1. Validar y crear el commit candidato localmente.
 2. Configurar Render con `APP_URL=https://buscador-terremoto-colombia.onrender.com` y `ENABLE_TEST_DATA=false`.
-3. Ejecutar `supabase login`, `supabase link --project-ref <PROJECT_REF>`, revisar y aplicar las siete migraciones con `supabase db push`.
-4. Verificar con `npm run inspect:production` o el snapshot administrativo la versión `202608130003`, RLS, grants, RPCs, buckets, conteos públicos y `deceasedFilterReady`.
+3. Ejecutar `supabase login`, `supabase link --project-ref <PROJECT_REF>`, revisar y aplicar las ocho migraciones con `supabase db push`.
+4. Verificar con `npm run inspect:production` o el snapshot administrativo la versión `202608130004`, RLS, grants, RPCs, buckets, conteos públicos y `deceasedFilterReady`.
 5. Con autorización independiente, ejecutar el CLI oficial y conservar su resumen agregado.
 6. Ejecutar `git push origin main`.
 7. Iniciar Manual Deploy del hash exacto y ejecutar smoke tests públicos y por cada rol.
@@ -459,7 +460,7 @@ npm run build
 npm run test:e2e
 ```
 
-La integración SQL vive en `tests/database-flows.sql` y debe ejecutarse contra una base limpia con las siete migraciones. Los tests deben usar datos ficticios, transacciones/rollback y roles adversariales.
+La integración SQL vive en `tests/database-flows.sql` y debe ejecutarse contra una base limpia con las ocho migraciones. Los tests deben usar datos ficticios, transacciones/rollback y roles adversariales.
 
 ## Diagnóstico temporal
 
@@ -491,8 +492,8 @@ No devuelve claves, filas, contactos, ubicaciones, rutas ni auditoría. Después
 
 - [x] Revisar el diff candidato.
 - [x] Ejecutar lint, typecheck, tests, build y E2E.
-- [x] Aplicar las siete migraciones en orden.
-- [x] Confirmar `schemaVersion = 202608130003`, `deceasedFilterReady = true`, conteos agregados y última migración.
+- [x] Aplicar las ocho migraciones en orden.
+- [x] Confirmar `schemaVersion = 202608130004`, `deceasedFilterReady = true`, conteos agregados y última migración.
 - [x] Auditar RLS y grants con `anon`, `authenticated` y service role.
 - [x] Verificar `report-evidence` privado.
 - [x] Verificar `public-portraits` público y sin objetos no aprobados.
@@ -515,7 +516,7 @@ No devuelve claves, filas, contactos, ubicaciones, rutas ni auditoría. Después
 
 Para retomar el proyecto:
 
-1. Leer `AGENTS.md`, este documento y las siete migraciones.
+1. Leer `AGENTS.md`, este documento y las ocho migraciones.
 2. Revisar `git status`, `git diff` y el commit desplegado antes de editar.
 3. No asumir el estado de Supabase por el estado de Git.
 4. Mantener el contrato público restringido a los RPCs/vista autorizados.

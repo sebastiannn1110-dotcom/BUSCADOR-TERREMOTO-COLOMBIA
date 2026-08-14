@@ -1646,6 +1646,72 @@ begin
     raise exception 'search_public_people official projection is unsafe or incomplete';
   end if;
 
+  -- The shared memorial portrait can only be applied by service_role, requires
+  -- a real JPEG object, affects only non-test confirmed-deceased cases and is
+  -- idempotent with one private audit record per effective case change.
+  insert into storage.objects (bucket_id, name, metadata)
+  values (
+    'public-portraits',
+    'memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+    jsonb_build_object('mimetype', 'image/jpeg', 'size', 53824)
+  ) on conflict (bucket_id, name) do nothing;
+
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_failed := false;
+  begin
+    perform public.apply_deceased_memorial_portrait(
+      'memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+      'https://project.supabase.co/storage/v1/object/public/public-portraits/memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+      53824,
+      'Intento ficticio sin privilegio de servicio'
+    );
+  exception when sqlstate '42501' then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'Authenticated caller applied the deceased memorial portrait';
+  end if;
+
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  v_result := public.apply_deceased_memorial_portrait(
+    'memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+    'https://project.supabase.co/storage/v1/object/public/public-portraits/memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+    53824,
+    'Aplicación ficticia y auditada de imagen conmemorativa'
+  );
+  select count(*)::integer into v_count
+  from public.cases c
+  join public.people p on p.id = c.person_id
+  where c.condition_status = 'deceased_confirmed'
+    and c.deleted_at is null
+    and p.is_test_data = false;
+  if (v_result ->> 'totalConfirmedDeceased')::integer <> v_count
+    or (v_result ->> 'mediaLinked')::integer <> v_count
+    or (v_result ->> 'cardsConfigured')::integer <> v_count
+    or (select primary_public_photo_url from public.public_case_cards where id = v_official_case_id) <>
+      'https://project.supabase.co/storage/v1/object/public/public-portraits/memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg'
+    or (select count(*) from public.audit_logs where action = 'deceased_memorial_portrait_applied') <> v_count then
+    raise exception 'Service memorial portrait application is incomplete or unaudited';
+  end if;
+
+  select count(*) into v_count_before
+  from public.audit_logs where action = 'deceased_memorial_portrait_applied';
+  v_result := public.apply_deceased_memorial_portrait(
+    'memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+    'https://project.supabase.co/storage/v1/object/public/public-portraits/memorial/deceased-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
+    53824,
+    'Reintento ficticio de imagen conmemorativa'
+  );
+  if (v_result ->> 'mediaLinked')::integer <> 0
+    or (v_result ->> 'cardsConfigured')::integer <> v_count
+    or (select count(*) from public.audit_logs where action = 'deceased_memorial_portrait_applied') <> v_count_before then
+    raise exception 'Memorial portrait replay was not idempotent';
+  end if;
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+
   -- Database ACL/RLS contracts are tested independently from application code.
   if to_regclass('storage.buckets') is not null
     and not exists (
@@ -1712,6 +1778,11 @@ begin
     or has_function_privilege('authenticated', 'public.bootstrap_initial_admin(uuid,text,text)', 'EXECUTE')
     or not has_function_privilege('service_role', 'public.bootstrap_initial_admin(uuid,text,text)', 'EXECUTE') then
     raise exception 'Initial admin bootstrap privileges are incorrect';
+  end if;
+  if has_function_privilege('anon', 'public.apply_deceased_memorial_portrait(text,text,integer,text)', 'EXECUTE')
+    or has_function_privilege('authenticated', 'public.apply_deceased_memorial_portrait(text,text,integer,text)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.apply_deceased_memorial_portrait(text,text,integer,text)', 'EXECUTE') then
+    raise exception 'Deceased memorial portrait privileges are incorrect';
   end if;
   if has_function_privilege('anon', 'public.manage_staff_profile(uuid,text,public.app_role,boolean,text)', 'EXECUTE')
     or has_function_privilege('service_role', 'public.manage_staff_profile(uuid,text,public.app_role,boolean,text)', 'EXECUTE')
@@ -1862,8 +1933,8 @@ begin
   end if;
 
   v_result := public.reports_debug_snapshot();
-  if v_result ->> 'schemaVersion' <> '202608130003'
-    or v_result ->> 'lastMigrationApplied' <> '202608130003'
+  if v_result ->> 'schemaVersion' <> '202608130004'
+    or v_result ->> 'lastMigrationApplied' <> '202608130004'
     or coalesce((v_result ->> 'deceasedFilterReady')::boolean, false) is not true
     or (v_result #>> '{publishedCounts,missing}')::bigint <> (
       select count(*)
@@ -1908,6 +1979,9 @@ begin
     )))
     or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
       'name', 'get_admin_case_message_threads', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'apply_deceased_memorial_portrait', 'found', true
     )))
     or not (v_result -> 'buckets' @> jsonb_build_array(jsonb_build_object(
       'name', 'report-evidence'

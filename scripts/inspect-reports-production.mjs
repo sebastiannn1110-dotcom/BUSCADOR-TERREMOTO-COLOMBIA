@@ -5,7 +5,7 @@
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-export const EXPECTED_SCHEMA_VERSION = "202608130003";
+export const EXPECTED_SCHEMA_VERSION = "202608130004";
 
 export const requiredEnvironment = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -57,6 +57,7 @@ export const expectedServiceRoleVisibleRpcs = [
   "preview_official_deceased_import",
   "import_official_deceased",
   "bootstrap_initial_admin",
+  "apply_deceased_memorial_portrait",
   "reports_debug_snapshot"
 ];
 
@@ -67,7 +68,8 @@ const expectedSnapshotRpcs = [
   "manage_staff_profile",
   "get_admin_people_cases",
   "withdraw_person_case",
-  "get_admin_case_message_threads"
+  "get_admin_case_message_threads",
+  "apply_deceased_memorial_portrait"
 ];
 
 // reports_debug_snapshot exposes RLS metadata for these physical tables. The

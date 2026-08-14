@@ -18,6 +18,8 @@
     "staff:manage": "tsx scripts/promote-admin.ts manage",
     "import:official-deceased": "tsx scripts/import-official-deceased-from-csv.ts",
     "inspect:production": "node --env-file=.env scripts/inspect-reports-production.mjs",
+    "memorial:prepare": "tsx scripts/apply-deceased-memorial-image.ts prepare",
+    "memorial:apply": "node --env-file=.env --import tsx scripts/apply-deceased-memorial-image.ts apply",
     "generate:avatars": "tsx scripts/generate-test-avatars.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo-cases.mjs",
     "verify:supabase": "node --env-file=.env scripts/verify-supabase-setup.mjs"
