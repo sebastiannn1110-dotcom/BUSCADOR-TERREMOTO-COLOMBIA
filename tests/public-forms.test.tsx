@@ -41,6 +41,22 @@ describe("formularios públicos simplificados", () => {
     expect(screen.getByLabelText(/Confirmo que esta información es de buena fe/)).toBeRequired();
   });
 
+  it("permite seleccionar una foto JPG aunque el móvil no informe su MIME", () => {
+    render(<MissingPersonForm />);
+    const photo = new File([new Uint8Array([255, 216, 255, 217])], "persona-ficticia.jpg", { type: "" });
+    fireEvent.change(screen.getByLabelText("Foto reciente (opcional)"), { target: { files: [photo] } });
+    expect(screen.getByText("Archivo seleccionado: persona-ficticia.jpg")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("explica cómo resolver una foto HEIC no compatible", () => {
+    render(<MissingPersonForm />);
+    const photo = new File([new Uint8Array([0, 0, 0, 0])], "foto-iphone.heic", { type: "image/heic" });
+    fireEvent.change(screen.getByLabelText("Foto reciente (opcional)"), { target: { files: [photo] } });
+    expect(screen.getByRole("alert")).toHaveTextContent("Si está en formato HEIC, conviértela o compártela como JPG");
+    expect(screen.queryByText(/Archivo seleccionado:/)).not.toBeInTheDocument();
+  });
+
   it("ofrece seis tipos de información y preselecciona corrección", () => {
     render(<InformationForm caseId="11111111-1111-4111-8111-111111111111" initialKind="correction" />);
     const selector = screen.getByLabelText("Tipo de información") as HTMLSelectElement;
@@ -72,7 +88,7 @@ describe("filtros públicos", () => {
   it("muestra solo los tres filtros públicos de esta fase", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) }));
     render(<SearchResults initialQuery="" initialStatus="missing" />);
-    await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "No encontramos coincidencias" })).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Todos" })).toHaveAttribute("href", "/buscar");
     expect(screen.getByRole("link", { name: "Desaparecidos" })).toHaveAttribute("href", "/buscar?estado=missing");
     expect(screen.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("href", "/buscar?estado=deceased_confirmed");
@@ -84,7 +100,7 @@ describe("filtros públicos", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<SearchResults initialQuery="" initialStatus="located_alive" />);
-    await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "No encontramos coincidencias" })).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Todos" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Localizados" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/search?q=", expect.any(Object));
@@ -94,7 +110,7 @@ describe("filtros públicos", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<SearchResults initialQuery="" initialStatus="deceased_confirmed" />);
-    await waitFor(() => expect(screen.getByText("0 coincidencias")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "No encontramos coincidencias" })).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Fallecidos confirmados" })).toHaveAttribute("aria-current", "page");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/search?q=&estado=deceased_confirmed",
@@ -108,5 +124,32 @@ describe("filtros públicos", () => {
     await waitFor(() => expect(screen.getByText("Página 2")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Página anterior" })).toHaveAttribute("href", "/buscar?q=Persona&estado=missing");
     expect(screen.getByRole("link", { name: "Página siguiente" })).toHaveAttribute("href", "/buscar?q=Persona&estado=missing&pagina=3");
+  });
+
+  it("no muestra un conteo parcial de coincidencias", async () => {
+    const results = Array.from({ length: 48 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      slug: `persona-${index}`,
+      full_name: `Persona ${index}`,
+      approximate_age: 30,
+      is_minor: false,
+      condition_status: "missing",
+      verification_level: "unverified",
+      urgency_level: "normal",
+      last_seen_at: null,
+      last_seen_location_public: "Lugar aproximado",
+      reported_unit: null,
+      primary_public_photo_url: null,
+      approved_reports_count: 0,
+      updated_at: "2026-08-13T12:00:00Z",
+      is_test_data: false,
+      public_source_label: null,
+      public_description: null
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results, hasMore: true }) }));
+    render(<SearchResults initialQuery="" initialStatus="" />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Persona 0" })).toBeInTheDocument());
+    expect(screen.queryByText("48 coincidencias")).not.toBeInTheDocument();
+    expect(document.querySelector(".results-count")).toBeNull();
   });
 });

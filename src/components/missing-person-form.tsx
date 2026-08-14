@@ -6,6 +6,24 @@ import { Turnstile } from "@/components/turnstile";
 
 type Draft = Record<string, string>;
 
+const supportedPhotoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function normalizedPhoto(file: File) {
+  if (supportedPhotoTypes.has(file.type)) return file;
+  const extension = file.name.toLocaleLowerCase("es").match(/\.([a-z0-9]+)$/)?.[1];
+  const inferredType = extension === "jpg" || extension === "jpeg"
+    ? "image/jpeg"
+    : extension === "png"
+      ? "image/png"
+      : extension === "webp"
+        ? "image/webp"
+        : null;
+  if (inferredType && (!file.type || file.type === "application/octet-stream" || file.type === "image/jpg")) {
+    return new File([file], file.name, { type: inferredType, lastModified: file.lastModified });
+  }
+  return null;
+}
+
 export function MissingPersonForm() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -45,12 +63,14 @@ export function MissingPersonForm() {
 
   function selectPhoto(file: File | undefined) {
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
-      setError("La foto debe ser JPG, PNG o WebP y pesar máximo 8 MB.");
+    const compatiblePhoto = normalizedPhoto(file);
+    if (!compatiblePhoto || file.size > 8 * 1024 * 1024) {
+      setPhoto(null);
+      setError("La foto debe ser JPG, PNG o WebP y pesar máximo 8 MB. Si está en formato HEIC, conviértela o compártela como JPG.");
       return;
     }
     setError("");
-    setPhoto(file);
+    setPhoto(compatiblePhoto);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -98,12 +118,15 @@ export function MissingPersonForm() {
         <label>Nombre completo<input name="fullName" required minLength={3} maxLength={140} autoCapitalize="words" defaultValue={draft.fullName || ""} /></label>
         <label>Edad aproximada (opcional)<input name="approximateAge" type="number" inputMode="numeric" min="0" max="120" defaultValue={draft.approximateAge || ""} /></label>
         <div>
-          <span className="field-label">Foto reciente (opcional)</span>
+          <span className="field-label" id="photo-label">Foto reciente (opcional)</span>
+          <p className="hint" id="photo-help">Formatos compatibles: JPG, PNG o WebP. Máximo 8 MB.</p>
           <div className="upload-actions">
-            <label className="button secondary file-button">Subir foto<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => selectPhoto(event.target.files?.[0])} /></label>
-            <label className="button secondary file-button">Tomar foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => selectPhoto(event.target.files?.[0])} /></label>
+            <input id="missing-person-photo" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" aria-labelledby="photo-label" aria-describedby="photo-help" onChange={(event) => selectPhoto(event.target.files?.[0])} />
+            <label className="button secondary file-button" htmlFor="missing-person-photo">Subir foto</label>
+            <input id="missing-person-camera" className="sr-only" type="file" accept="image/*" capture="environment" aria-label="Tomar foto con la cámara" aria-describedby="photo-help" onChange={(event) => selectPhoto(event.target.files?.[0])} />
+            <label className="button secondary file-button" htmlFor="missing-person-camera">Tomar foto</label>
           </div>
-          <p className="hint">La foto ayuda a identificar a la persona. Si no tienes foto, puedes continuar.</p>
+          <p className="hint">La foto ayuda a identificar a la persona. Si no tienes una compatible, puedes continuar sin foto.</p>
           {photo && <p className="file-selected">Archivo seleccionado: {photo.name}</p>}
         </div>
         <label>Descripción para identificarla (opcional)

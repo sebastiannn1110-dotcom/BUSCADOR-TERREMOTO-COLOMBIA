@@ -76,7 +76,7 @@ export function SearchResults({ initialQuery, initialStatus, initialPage = "1" }
         aria-current={activeStatus === filter.value ? "page" : undefined}
       >{filter.label}</Link>)}
     </nav>
-    <p className="results-count" aria-live="polite">{loading ? "Buscando casos…" : `${results.length} coincidencia${results.length === 1 ? "" : "s"}`}</p>
+    <p className="sr-only" role="status" aria-live="polite">{loading ? "Buscando casos…" : results.length ? "Resultados disponibles" : "Sin resultados"}</p>
     {!loading && page > 1 && <p className="page-indicator">Página {page}</p>}
     {error
       ? <p className="form-error" role="alert">{error}</p>

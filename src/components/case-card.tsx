@@ -18,7 +18,7 @@ export function CaseCard({ item }: { item: CaseCardType }) {
     <Link href={casePath} className="card-link" aria-label={`Ver caso de ${item.full_name}`}>
       <div className="portrait">
         {item.primary_public_photo_url
-          ? <Image src={item.primary_public_photo_url} alt={`Foto publicada de ${item.full_name}`} fill sizes="(max-width: 700px) 100vw, 33vw" />
+          ? <Image src={item.primary_public_photo_url} alt={`Foto publicada de ${item.full_name}`} fill sizes="(max-width: 720px) 50vw, 33vw" />
           : <PhotoPlaceholder />}
       </div>
       <div className="card-body">

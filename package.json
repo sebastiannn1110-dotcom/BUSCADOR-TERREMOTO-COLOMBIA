@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "video:tour:35": "tsx scripts/record-site-tour-35s.ts",
     "staff:bootstrap": "tsx scripts/promote-admin.ts bootstrap",
     "staff:manage": "tsx scripts/promote-admin.ts manage",
     "import:official-deceased": "tsx scripts/import-official-deceased-from-csv.ts",

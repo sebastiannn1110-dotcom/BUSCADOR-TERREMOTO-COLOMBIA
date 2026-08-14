@@ -7,15 +7,31 @@
   .hero { margin: 18px auto 32px; text-align: left; }
   .hero .search-box { margin: 0; }
   .hero .text-button { min-height: 44px; display: flex; align-items: center; }
-  .action-grid,.case-grid { gap: 12px; }
+  .action-grid { gap: 12px; }
+  .case-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .case-card { min-width: 0; }
   .action { min-height: 104px; padding: 17px; }
-  .portrait { height: min(122vw, 380px); }
+  .portrait { height: 158px; }
+  .card-body { padding: 10px; }
+  .card-body h3 { display: -webkit-box; overflow: hidden; margin-top: 2px; font-size: 1rem; line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .card-body p,.card-body dd { font-size: .82rem; }
+  .card-body dl { margin: 9px 0; }
+  .card-body dl div { padding: 5px 0; }
+  .card-body dt { font-size: .7rem; }
+  .badge,.verification { margin: 6px 2px 3px 0; padding: 4px 7px; font-size: .72rem; line-height: 1.2; }
+  .card-actions { flex-direction: column; gap: 6px; padding: 0 10px 10px; }
+  .card-actions .button { min-height: 44px; padding: 7px; font-size: .78rem; line-height: 1.25; }
   .detail-photo { max-width: 100%; height: 320px; }
   .report-form { padding: 15px; gap: 14px; }
   .form-actions { background: #fff; padding: 10px 0 max(10px, env(safe-area-inset-bottom)); }
   .form-actions .button { flex: 1; }
   footer { padding: 22px 12px; }
   .footer-emergency { margin: 22px -12px -22px; border-top: 5px solid #b77a12; padding: 16px 12px; background: #f9f0d8; color: #17202a; }
+}
+
+@media (max-width: 340px) {
+  .case-grid { grid-template-columns: 1fr; }
+  .portrait { height: 230px; }
 }
 
 .footer-emergency { margin-top: 22px; max-width: 850px; background: #f9f0d8; border-left: 5px solid #b77a12; padding: 14px 16px; color: #17202a; font-size: 1rem; }
