@@ -18,6 +18,7 @@
     "staff:bootstrap": "tsx scripts/promote-admin.ts bootstrap",
     "staff:manage": "tsx scripts/promote-admin.ts manage",
     "import:official-deceased": "tsx scripts/import-official-deceased-from-csv.ts",
+    "import:missing": "tsx scripts/import-missing.ts",
     "inspect:production": "node --env-file=.env scripts/inspect-reports-production.mjs",
     "memorial:prepare": "tsx scripts/apply-deceased-memorial-image.ts prepare",
     "memorial:apply": "node --env-file=.env --import tsx scripts/apply-deceased-memorial-image.ts apply",
@@ -32,6 +33,7 @@
     "openai": "^4.86.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "read-excel-file": "^9.3.10",
     "sharp": "0.35.3",
     "zod": "^3.24.2"
   },

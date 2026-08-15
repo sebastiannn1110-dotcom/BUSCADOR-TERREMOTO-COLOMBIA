@@ -4,23 +4,23 @@ Este procedimiento maneja información oficial sensible. Preparar el archivo no 
 
 ## Prerrequisitos
 
-- Las ocho migraciones deben estar aplicadas. Antes del push/deploy, el gate disponible es `npm run inspect:production` o una consulta administrativa directa a `reports_debug_snapshot`: debe confirmar `schemaVersion: "202608130004"`, `lastMigrationApplied: "202608130004"` y `deceasedFilterReady: true`. El `/api/health` nuevo se valida después del Manual Deploy.
+- Las nueve migraciones deben estar aplicadas, incluida `202608150001_admin_portraits_and_person_imports.sql`. Antes del push/deploy valida RPCs, RLS, ledger y buckets en una instancia controlada. El `/api/health` se comprueba después del Manual Deploy.
 - La persona operadora debe tener un perfil Supabase Auth activo con rol `admin`.
 - `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` deben apuntar al proyecto de destino.
 - La sesión debe suministrar un `SUPABASE_ADMIN_ACCESS_TOKEN` vigente obtenido mediante una sesión normal de Supabase Auth de ese administrador. No uses `SUPABASE_SERVICE_ROLE_KEY` como sustituto; consulta [moderation-workflow.md](moderation-workflow.md#gestión-posterior-de-staff) para el mismo contrato operativo de token efímero.
 - Debe existir una razón administrativa verificable de 10–1000 caracteres.
 
-## Dos formatos separados
+## Formatos admitidos
 
-### Importador web legado
+### Importador web CSV/Excel
 
-La URL `/admin/importar-fallecidos` exige Supabase Auth y rol `admin`. Conserva el CSV legado de siete columnas, disponible como plantilla en `data/templates/medicina-legal-fallecidos-template.csv` y `/templates/medicina-legal-fallecidos-template.csv`:
+Las URL `/admin/importar-fallecidos` y `/admin/importar-personas` exigen Supabase Auth y rol `admin`. Aceptan `.csv`, `.xlsx` o tabla pegada con diez columnas:
 
 ```text
-full_name,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
+source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
 ```
 
-Este flujo acepta hasta 500 filas/512 KB, genera una vista previa ligada al usuario y al archivo, y exige confirmar la fuente y una justificación antes de importar. No añadas `source_row`, `reported_unit` ni `gender` a esta plantilla: el importador web mantiene compatibilidad con el contrato anterior.
+Este flujo acepta hasta 500 filas/5 MB, genera una vista previa ligada al usuario y al archivo, y exige confirmar la fuente y una justificación antes de importar. `full_name`, `source_name=Medicina Legal` y `source_reference` son obligatorios. Edad, género, unidad, lugar y fecha pueden quedar vacíos y permanecen desconocidos.
 
 ### CLI de la captura del 13 de agosto
 
@@ -110,7 +110,7 @@ Registro operativo del 13 de agosto de 2026: el preview autorizado clasificó la
    ```json
    {
      "databaseReachable": true,
-     "schemaVersion": "202608130004",
+     "schemaVersion": "202608150001",
      "deceasedRouteAvailable": true,
      "appUrlConfiguredCorrectly": true
    }

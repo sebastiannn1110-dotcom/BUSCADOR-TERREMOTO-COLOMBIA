@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { PublicPortraitEditor } from "@/components/public-portrait-editor";
 import { publicCasePath } from "@/lib/public-case-route";
 
 type ManagedPerson = {
@@ -14,6 +15,7 @@ type ManagedPerson = {
   publicationStatus: string;
   reportedUnit: string | null;
   publicLocation: string | null;
+  publicPhotoUrl: string | null;
   publishedAt: string | null;
   withdrawnAt: string | null;
   updatedAt: string;
@@ -117,6 +119,12 @@ export function AdminPeopleManager({ canWithdraw }: { canWithdraw: boolean }) {
           <div><dt>Publicada</dt><dd>{formatDate(item.publishedAt)}</dd></div>
           {item.withdrawnAt && <div><dt>Retirada</dt><dd>{formatDate(item.withdrawnAt)}</dd></div>}
         </dl>
+        {item.publicationStatus === "published" && <PublicPortraitEditor
+          caseId={item.caseId}
+          fullName={item.fullName}
+          currentPhotoUrl={item.publicPhotoUrl}
+          onUpdated={() => load()}
+        />}
         {item.publicationStatus === "published" && <p><Link href={publicCasePath(item.slug)}>Abrir ficha pública</Link></p>}
         {canWithdraw && item.publicationStatus === "published" && <form className="report-form compact-form" onSubmit={(event) => withdraw(event, item)}>
           <label>Razón obligatoria del retiro<textarea name="reason" minLength={3} maxLength={1000} required /></label>

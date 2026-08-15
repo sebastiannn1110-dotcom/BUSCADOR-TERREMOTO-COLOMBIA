@@ -173,7 +173,7 @@ Por compatibilidad, `/reporte/confirmacion/[trackingCode]` valida el formato y r
 2. El moderador consulta la evidencia mediante el proxy privado auditado.
 3. Los campos de publicación empiezan vacíos; se redactan de nuevo y rechazan teléfonos/correos.
 4. `publish` exige lugar público aproximado y razón.
-5. Una foto opcional se transforma a JPEG de hasta 1600 × 1600, sin EXIF, y se sube a `public-portraits`.
+5. Una foto opcional se transforma a JPEG con lado mayor de hasta 1200 px, sin EXIF, y se sube a `public-portraits`.
 6. `review_pending_person_case` publica como `missing` + `moderator_reviewed`, o aplica `reject`, `duplicate`, `request_information` o `archive`.
 7. La acción y auditoría quedan registradas. Un error posterior a la subida activa limpieza del retrato.
 
@@ -193,7 +193,7 @@ Esta ruta no puede confirmar fallecimientos.
 
 ### Fallecimientos oficiales
 
-`/admin/importar-fallecidos` y su ayuda requieren `admin`. El importador web conserva el CSV legado de siete columnas, con `source_reference` obligatoria, preview ligado al usuario/CSV, confirmación explícita y justificación.
+`/admin/importar-fallecidos`, `/admin/importar-personas` y la ayuda requieren `admin`. El importador acepta CSV/Excel/tabla pegada, con `source_reference` obligatoria, preview ligado al usuario/contenido/tipo/verificación, confirmación explícita y justificación.
 
 El CLI `npm run import:official-deceased -- data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv` maneja por separado el archivo controlado de diez columnas y 142 filas 1–142. Exige token de sesión de un admin, razón y `CONFIRM_OFFICIAL_IMPORT=MEDICINA_LEGAL`; ejecuta preview, bloquea revisión manual y usa `source_reference + source_row` como identidad idempotente privada. El detalle está en [importar-fallecidos-medicina-legal.md](importar-fallecidos-medicina-legal.md).
 
@@ -224,6 +224,7 @@ El CLI `npm run import:official-deceased -- data/imports/medicina-legal-fallecid
 | `/admin/seguimiento-contactos` | Staff; escritura moderator/admin | Seguimientos privados. |
 | `/admin/importar-fallecidos` | Admin | Importación oficial. |
 | `/admin/importar-fallecidos/ayuda` | Admin | Guía del CSV. |
+| `/admin/importar-personas` | Admin | Importación unificada CSV/Excel de desaparecidos o fallecidos. |
 
 ### Route handlers
 
@@ -254,6 +255,8 @@ No existen rutas equivalentes bajo Pages Router. Las respuestas administrativas 
 | `SightingsQueue` | Cola de reportes y acciones según rol. |
 | `ContactFollowupsQueue` | Seguimiento privado append-only. |
 | `OfficialDeceasedImporter` | Preview y confirmación CSV. |
+| `PeopleImporter` | Selector, archivo/tabla, preview y confirmación CSV/Excel. |
+| `PublicPortraitEditor` | Subir, reemplazar o quitar un retrato público. |
 | `Turnstile` | CAPTCHA opcional. |
 | `PhotoPlaceholder` | Fallback cuando no hay retrato aprobado. |
 
@@ -308,8 +311,9 @@ RLS protege tablas privadas. Las migraciones 005 y 006 revocan DML directo y fue
 | 6 | `202608130002_official_deceased_capture_and_diagnostics.sql` | `reported_unit`, bitácora privada por referencia/fila, RPCs compatibles con ambos importadores y diagnóstico/conteos agregados. |
 | 7 | `202608130003_admin_case_withdrawal_and_message_threads.sql` | Retiro lógico auditado, gestión de publicadas, hilos privados por caso y diagnóstico `202608130003`. |
 | 8 | `202608130004_deceased_memorial_portrait.sql` | Imagen conmemorativa compartida,  vínculo auditado por caso fallecido y diagnóstico `202608130004`, sin cambiar estados. |
+| 9 | `202608150001_admin_portraits_and_person_imports.sql` | Retratos individuales auditados, ledger/importador de desaparecidos, persistencia opcional de género oficial y proyección pública sin fallback fotográfico inventado. |
 
-La versión esperada por `reports_debug_snapshot` es `202608130004`. Hay que contrastar `lastMigrationApplied`, `schemaVersion`, `publishedCounts`, `deceasedFilterReady`, tablas, RLS, RPCs y buckets en cada liberación.
+La versión esperada por `reports_debug_snapshot` después de aplicar la novena migración es `202608150001`. Hay que contrastar `lastMigrationApplied`, `schemaVersion`, `publishedCounts`, `deceasedFilterReady`, tablas, RLS, RPCs y buckets en cada liberación.
 
 ## RPCs vigentes
 
@@ -350,7 +354,7 @@ La migración 004 asegura el bucket privado. La 005 asegura `public-portraits`. 
 1. autorización y auditoría de la evidencia;
 2. descarga con service role;
 3. validación de MIME, tamaño y píxeles;
-4. auto-rotación y resize máximo 1600 × 1600;
+4. auto-rotación y resize con lado mayor máximo de 1200 px;
 5. salida JPEG progresiva sin metadatos originales;
 6. subida `portraits/{caseId}/{uuid}.jpg`;
 7. validación del objeto y relación en RPC.
@@ -359,17 +363,17 @@ El público nunca recibe `private_path` ni una URL firmada de `report-evidence`.
 
 ## Importación de Medicina Legal
 
-### Importador web legado
+### Importador web CSV/Excel
 
-El contrato de `/admin/importar-fallecidos` mantiene siete columnas:
+`/admin/importar-fallecidos` y `/admin/importar-personas` aceptan `.csv`, `.xlsx` o tabla pegada con diez columnas:
 
 ```text
-full_name,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
+source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
 ```
 
-No incluye `gender`, `source_row` ni `reported_unit`. `full_name`, `source_name` y `source_reference` son obligatorios. La fuente MVP es Medicina Legal. Los campos públicos rechazan contacto obvio. Límite: 500 filas y 512 KB.
+`full_name`, `source_name` y `source_reference` son obligatorios. La fuente MVP es Medicina Legal. Edad, género, unidad, lugar y fecha pueden quedar vacíos. Los campos públicos rechazan contacto obvio. Límite: 500 filas y 5 MB.
 
-La API firma un token ligado a usuario, CSV y vencimiento. Confirmar exige el mismo CSV, checkbox de fuente oficial y razón de 10–1000 caracteres; luego repite preview antes del RPC de importación.
+La API firma un token ligado a usuario, contenido, tipo, nivel de verificación y vencimiento. Confirmar exige el mismo archivo/tabla, checkbox de fuente oficial y razón de 10–1000 caracteres; luego repite preview antes del RPC de importación.
 
 ### Captura controlada 2026-08-13
 
@@ -379,11 +383,19 @@ La API firma un token ligado a usuario, CSV y vencimiento. Confirmar exige el mi
 source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
 ```
 
-Contiene exactamente 142 registros, filas de fuente 1–142. El género queda solo en el CSV; el payload al RPC lo omite. `reported_unit` conserva **Unidad Básica** y se muestra como `Unidad básica / lugar reportado`, sin afirmar lugar de muerte. La fecha queda desconocida si la captura no la aporta. No hay fotos ni se generan retratos.
+Contiene exactamente 142 registros, filas de fuente 1–142. El género se conserva internamente, pero no se proyecta al público. `reported_unit` conserva **Unidad Básica** y se muestra como `Unidad básica / lugar reportado`, sin afirmar lugar de muerte. La fecha queda desconocida si la captura no la aporta. No hay fotos ni se generan retratos.
 
 El CLI exige `CONFIRM_OFFICIAL_IMPORT=MEDICINA_LEGAL`, `SUPABASE_ADMIN_ACCESS_TOKEN` y `OFFICIAL_IMPORT_REASON`. `preview_official_deceased_import` clasifica este flujo como `create`, `already_imported` o `review_required`; una coincidencia solo por nombre siempre requiere resolución manual y nunca convierte automáticamente un caso existente. Cualquier revisión bloquea la importación. La combinación privada `source_reference + source_row` y una huella canónica permiten que una referencia común identifique las 142 filas y que solo un replay exacto omita trabajo sin duplicar casos ni auditoría. Una persona distinta o un payload cambiado con la misma clave se bloquean.
 
 El resultado válido establece `published`, `deceased_confirmed`, `authority_confirmed`, fuente pública `Medicina Legal`, referencia y razón privadas, historial y auditoría. Preview + confirmación son dos pasos técnicos, no una aprobación independiente de cuatro ojos. El CSV está listo para importar, pero este estado del repositorio no prueba que el comando se haya ejecutado en producción.
+
+## Importación de desaparecidos
+
+El contrato canónico es `source_row,full_name,department_disappearance,municipality_disappearance,source_name,source_reference,public_description`. También se mapean los encabezados administrativos en español. Los opcionales vacíos permanecen vacíos. Una lista revisada por moderación crea casos `pending_review`; una fuente oficial confirmada puede crear `published` + `authority_confirmed`. `person_import_entries` implementa replay idempotente y cualquier homónimo requiere revisión manual. Véase [importar-desaparecidos.md](importar-desaparecidos.md).
+
+## Analytics
+
+`NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` habilita el beacon manual de Cloudflare únicamente en `/`, `/fallecidos` sin parámetros y `/privacidad`, con `spa:false`. Búsqueda, slugs, recibos, formularios y administración están excluidos. No hay Google Analytics ni eventos personalizados. Véase [analytics.md](analytics.md).
 
 ## Autenticación y roles
 
@@ -412,6 +424,7 @@ El resultado válido establece `published`, `deceased_confirmed`, `authority_con
 
 - Turnstile: `CAPTCHA_PROVIDER`, `NEXT_PUBLIC_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`.
 - IA: `OPENAI_API_KEY`, `OPENAI_MODEL`.
+- Analítica general opcional: `NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN`; no es secreto, pero exige nuevo build en Render.
 - Emergencia: `EMERGENCY_MESSAGE`, `EMERGENCY_PHONE`.
 - No hay integración de mensajería automática; el seguimiento actual es manual.
 - Diagnóstico temporal: `DEBUG_REPORTS_TOKEN`, aleatorio y de al menos 32 caracteres; eliminar tras la investigación.
@@ -442,8 +455,8 @@ Los casos se marcan `is_test_data=true` y la vista pública vigente los excluye.
 
 1. Validar y crear el commit candidato localmente.
 2. Configurar Render con `APP_URL=https://buscador-terremoto-colombia.onrender.com` y `ENABLE_TEST_DATA=false`.
-3. Ejecutar `supabase login`, `supabase link --project-ref <PROJECT_REF>`, revisar y aplicar las ocho migraciones con `supabase db push`.
-4. Verificar con `npm run inspect:production` o el snapshot administrativo la versión `202608130004`, RLS, grants, RPCs, buckets, conteos públicos y `deceasedFilterReady`.
+3. Ejecutar `supabase login`, `supabase link --project-ref <PROJECT_REF>`, revisar y aplicar las nueve migraciones con `supabase db push`.
+4. Verificar con `npm run inspect:production` o el snapshot administrativo la versión `202608150001`, RLS, grants, RPCs, buckets, conteos públicos y `deceasedFilterReady`.
 5. Con autorización independiente, ejecutar el CLI oficial y conservar su resumen agregado.
 6. Ejecutar `git push origin main`.
 7. Iniciar Manual Deploy del hash exacto y ejecutar smoke tests públicos y por cada rol.
@@ -460,7 +473,7 @@ npm run build
 npm run test:e2e
 ```
 
-La integración SQL vive en `tests/database-flows.sql` y debe ejecutarse contra una base limpia con las ocho migraciones. Los tests deben usar datos ficticios, transacciones/rollback y roles adversariales.
+La integración SQL vive en `tests/database-flows.sql` y debe ejecutarse contra una base limpia con las nueve migraciones. Los tests deben usar datos ficticios, transacciones/rollback y roles adversariales.
 
 ## Diagnóstico temporal
 
@@ -492,8 +505,8 @@ No devuelve claves, filas, contactos, ubicaciones, rutas ni auditoría. Después
 
 - [x] Revisar el diff candidato.
 - [x] Ejecutar lint, typecheck, tests, build y E2E.
-- [x] Aplicar las ocho migraciones en orden.
-- [x] Confirmar `schemaVersion = 202608130004`, `deceasedFilterReady = true`, conteos agregados y última migración.
+- [ ] Aplicar la novena migración en producción con `supabase db push` (las ocho anteriores constaban verificadas).
+- [ ] Confirmar en producción `schemaVersion = 202608150001`, `deceasedFilterReady = true`, conteos agregados y última migración después de `supabase db push`.
 - [x] Auditar RLS y grants con `anon`, `authenticated` y service role.
 - [x] Verificar `report-evidence` privado.
 - [x] Verificar `public-portraits` público y sin objetos no aprobados.
@@ -516,7 +529,7 @@ No devuelve claves, filas, contactos, ubicaciones, rutas ni auditoría. Después
 
 Para retomar el proyecto:
 
-1. Leer `AGENTS.md`, este documento y las ocho migraciones.
+1. Leer `AGENTS.md`, este documento y las nueve migraciones.
 2. Revisar `git status`, `git diff` y el commit desplegado antes de editar.
 3. No asumir el estado de Supabase por el estado de Git.
 4. Mantener el contrato público restringido a los RPCs/vista autorizados.

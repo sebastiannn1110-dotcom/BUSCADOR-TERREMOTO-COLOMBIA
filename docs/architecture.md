@@ -51,7 +51,7 @@ flowchart TD
 
 ## Esquema y migraciones
 
-Las ocho migraciones son acumulativas. `202608130001_production_review_and_contact_followups.sql` agrega `contact_followups`, las colas/RPCs de revisión y el bucket de retratos. `202608130002_official_deceased_capture_and_diagnostics.sql` añade `reported_unit` y la bitácora privada idempotente de importación oficial. `202608130003_admin_case_withdrawal_and_message_threads.sql` incorpora retiro lógico auditado, gestión de personas publicadas e hilos privados. `202608130004_deceased_memorial_portrait.sql` enlaza de forma auditada el retrato conmemorativo y eleva el diagnóstico a `202608130004` sin cambiar estados.
+Las nueve migraciones son acumulativas. `202608130001_production_review_and_contact_followups.sql` agrega `contact_followups`, las colas/RPCs de revisión y el bucket de retratos. `202608130002_official_deceased_capture_and_diagnostics.sql` añade `reported_unit` y la bitácora privada idempotente de importación oficial. `202608130003_admin_case_withdrawal_and_message_threads.sql` incorpora retiro lógico auditado, gestión de personas publicadas e hilos privados. `202608130004_deceased_memorial_portrait.sql` enlaza de forma auditada el retrato conmemorativo. `202608150001_admin_portraits_and_person_imports.sql` añade retratos individuales, ledger/importador de desaparecidos con RLS forzado, importación XLSX y diagnóstico `202608150001`, sin cambiar estados desde rutas públicas.
 
 El endpoint temporal `GET /api/debug/reports`, protegido con `x-debug-token`, usa la service role para informar presencia de tablas, RPCs, buckets, RLS y última migración. No devuelve secretos, filas ni rutas de archivos.
 

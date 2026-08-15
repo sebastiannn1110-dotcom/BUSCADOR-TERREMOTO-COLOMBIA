@@ -41,7 +41,7 @@ export function CaseCard({ item }: { item: CaseCardType }) {
             {medicinaLegal && <p>Información tomada de las listas de Medicina Legal</p>}
           </>
           : <dl>
-            <div><dt>Último lugar conocido</dt><dd>{item.last_seen_location_public || "No informado"}</dd></div>
+            <div><dt>Lugar reportado</dt><dd>{item.last_seen_location_public || "No especificado"}</dd></div>
             <div><dt>Última actualización</dt><dd>{formatDate(item.updated_at)}</dd></div>
             <div><dt>Posibles avistamientos revisados</dt><dd>{sightingCount}</dd></div>
             {item.latest_approved_sighting_location

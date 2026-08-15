@@ -31,7 +31,8 @@ Las páginas públicas solo consultan el contrato permitido: `public_case_cards`
 | `/admin/posibles-avistamientos` | Igual que `/admin/avistamientos` | Alias que redirige a la cola canónica. |
 | `/admin/seguimiento-contactos` | Lectura: todos; escritura: `admin`, `moderator` | Contactos privados y seguimientos append-only. |
 | `/admin/importar-fallecidos` | `admin` | Vista previa y confirmación de importación oficial. |
-| `/admin/importar-fallecidos/ayuda` | `admin` | Preparación y revisión del CSV. |
+| `/admin/importar-fallecidos/ayuda` | `admin` | Preparación y revisión de CSV/Excel. |
+| `/admin/importar-personas` | `admin` | Importador unificado CSV/Excel/tabla pegada para desaparecidos y fallecidos. |
 
 `responder` ve las colas y el historial autorizados, pero la UI oculta formularios de moderación y escritura. Los RPCs vuelven a aplicar esa restricción en PostgreSQL.
 
@@ -51,6 +52,8 @@ Las páginas públicas solo consultan el contrato permitido: `public_case_cards`
 | `/api/admin/contact-followups` | `GET`, `POST` | Cola y altas append-only de seguimiento. |
 | `/api/admin/private-media/[assetId]` | `GET` | Acceso autenticado y auditado a evidencia privada. |
 | `/api/admin/import-deceased` | `POST` | Modos `preview` y `confirm` del importador oficial. |
+| `/api/admin/import-people` | `POST` | Importador multipart unificado; preview firmado y confirmación auditada. |
+| `/api/admin/cases/[caseId]/portrait` | `POST`, `DELETE` | Subir/reemplazar o quitar retrato público; solo `moderator`/`admin`. |
 
 Las respuestas administrativas con datos sensibles usan `Cache-Control: private, no-store`. Los conteos del diagnóstico son agregados y solo consideran registros públicos válidos; nunca devuelve nombres, referencias privadas, contactos ni filas del importador.
 

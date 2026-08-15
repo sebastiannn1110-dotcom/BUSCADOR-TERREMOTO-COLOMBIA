@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     try {
       sanitizedPortrait = await sharp(await sourceBlob.arrayBuffer(), { failOn: "warning", limitInputPixels: 40_000_000 })
         .rotate()
-        .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+        .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: 88, progressive: true })
         .toBuffer();
     } catch {

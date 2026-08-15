@@ -39,10 +39,21 @@ Retirar una persona publicada no ejecuta un borrado físico: `withdraw_person_ca
 - `report-evidence` es privado y contiene fotos o evidencia recibida.
 - `public-portraits` es público y solo debe contener retratos aprobados.
 - El acceso administrativo a evidencia pasa por una ruta protegida y un RPC que registra auditoría.
-- Al aprobar una foto, el servidor valida formato y tamaño, corrige orientación, limita a 1600 × 1600, la recodifica como JPEG y no conserva metadatos EXIF. Solo entonces la sube a una ruta `portraits/{caseId}/{uuid}.jpg`.
+- Al aprobar una foto, el servidor valida formato y tamaño, corrige orientación, limita el lado mayor a 1200 px, la recodifica como JPEG y no conserva metadatos EXIF. Solo entonces la sube a una ruta `portraits/{caseId}/{uuid}.jpg`.
 - Si falla la revisión después de subir el retrato, la API intenta eliminar el objeto promovido.
+- Subir, reemplazar y quitar retratos son acciones separadas en `moderation_actions` y `audit_logs`. Al reemplazar o quitar, la URL anterior se retira antes de intentar borrar el objeto físico; por ello no sigue expuesta aunque una limpieza de Storage requiera atención operativa.
 
 La separación de buckets evita que una ruta privada se convierta accidentalmente en URL pública.
+
+## Analítica mínima
+
+Cloudflare Web Analytics es opcional y no se carga sin `NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN`. La integración manual usa el beacon oficial, `spa:false` y una lista positiva de rutas: `/`, `/fallecidos` sin parámetros y `/privacidad`. Se excluyen búsquedas, fichas con slug, recibos, formularios y todo el panel administrativo. No existen eventos propios, Google Analytics ni persistencia de nombres buscados.
+
+Cloudflare documenta que Web Analytics no registra query strings ni admite eventos personalizados actualmente, pero la exclusión local se conserva como defensa adicional. No se deben ampliar las rutas medidas sin una revisión de privacidad. Detalle operativo: [analytics.md](analytics.md).
+
+## Importaciones
+
+Los archivos se analizan en una API administrativa y solo se escriben mediante RPCs `security definer`. La confirmación queda ligada a usuario, contenido, tipo, nivel de verificación y vencimiento. Una fuente no oficial de desaparecidos crea `pending_review`; la autoridad confirmada exige checkbox, fuente y referencia. El ledger privado evita replays y bloquea homónimos. Los campos vacíos permanecen `null`/vacíos y nunca se completan con suposiciones.
 
 ## Roles
 
@@ -74,4 +85,4 @@ Los reportes de posible atrapamiento o posible fallecimiento exigen contacto y s
 
 ## Responsabilidades operativas pendientes
 
-Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las ocho migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.
+Antes de usar datos reales, la organización debe definir retención y borrado, respuesta a incidentes, derechos del titular, revisión legal, MFA para personal, rotación de credenciales, monitoreo y respaldo. También debe comprobar en el proyecto Supabase de producción que las nueve migraciones, RLS, grants, RPCs, conteos agregados y buckets coincidan con el repositorio.

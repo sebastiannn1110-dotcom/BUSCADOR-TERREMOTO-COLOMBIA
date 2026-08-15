@@ -18,6 +18,7 @@ import { GET as getContactFollowups, POST as logContactFollowup } from "@/app/ap
 import { GET as getManagedPeople, POST as withdrawPerson } from "@/app/api/admin/people/route";
 import { GET as getCaseMessages } from "@/app/api/admin/case-messages/route";
 import { POST as importDeceased } from "@/app/api/admin/import-deceased/route";
+import { DELETE as removePortrait, POST as uploadPortrait } from "@/app/api/admin/cases/[caseId]/portrait/route";
 
 const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const moderator = { id: "22222222-2222-4222-8222-222222222222", role: "moderator" };
@@ -355,6 +356,93 @@ describe("rutas administrativas", () => {
     }));
 
     expect(response.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("permite a moderación subir y recodificar un retrato público", async () => {
+    authenticated();
+    const remove = vi.fn().mockResolvedValue({ data: [], error: null });
+    const upload = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const getPublicUrl = vi.fn((path: string) => ({ data: { publicUrl: `https://project.supabase.co/storage/v1/object/public/public-portraits/${path}` } }));
+    storageFrom.mockReturnValue({ upload, getPublicUrl, remove });
+    adminSupabase.mockReturnValue({ storage: { from: storageFrom } });
+    rpc.mockResolvedValue({ data: { action: "upload_public_portrait", oldObjectPath: null }, error: null });
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    const form = new FormData();
+    form.set("file", new File([png], "persona.png", { type: "image/png" }));
+    form.set("reason", "Retrato revisado por moderación");
+
+    const response = await uploadPortrait(new NextRequest(`http://localhost/api/admin/cases/${caseId}/portrait`, { method: "POST", body: form }), {
+      params: Promise.resolve({ caseId })
+    });
+
+    expect(response.status).toBe(200);
+    expect(upload).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^portraits/${caseId}/[0-9a-f-]+\\.jpg$`)),
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg", upsert: false })
+    );
+    expect(rpc).toHaveBeenCalledWith("set_public_case_portrait", expect.objectContaining({
+      p_case_id: caseId,
+      p_sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      p_reason: "Retrato revisado por moderación"
+    }));
+    expect((await response.json()).message).toBe("Foto actualizada correctamente.");
+  });
+
+  it("reemplaza la foto y elimina físicamente el objeto anterior después del RPC", async () => {
+    authenticated();
+    const oldPath = `portraits/${caseId}/77777777-7777-4777-8777-777777777777.jpg`;
+    const remove = vi.fn().mockResolvedValue({ data: [], error: null });
+    storageFrom.mockReturnValue({
+      upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      getPublicUrl: vi.fn((path: string) => ({ data: { publicUrl: `https://project.supabase.co/storage/v1/object/public/public-portraits/${path}` } })),
+      remove
+    });
+    adminSupabase.mockReturnValue({ storage: { from: storageFrom } });
+    rpc.mockResolvedValue({ data: { action: "replace_public_portrait", oldObjectPath: oldPath }, error: null });
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    const form = new FormData();
+    form.set("file", new File([png], "reemplazo.png", { type: "image/png" }));
+    form.set("reason", "Reemplazo revisado por moderación");
+
+    expect((await uploadPortrait(new NextRequest(`http://localhost/api/admin/cases/${caseId}/portrait`, { method: "POST", body: form }), {
+      params: Promise.resolve({ caseId })
+    })).status).toBe(200);
+    expect(remove).toHaveBeenLastCalledWith([oldPath]);
+  });
+
+  it("quita la foto pública mediante RPC auditado y borra el objeto", async () => {
+    authenticated();
+    const oldPath = `portraits/${caseId}/77777777-7777-4777-8777-777777777777.jpg`;
+    const remove = vi.fn().mockResolvedValue({ data: [], error: null });
+    storageFrom.mockReturnValue({ remove });
+    adminSupabase.mockReturnValue({ storage: { from: storageFrom } });
+    rpc.mockResolvedValue({ data: { action: "remove_public_portrait", oldObjectPath: oldPath }, error: null });
+
+    const response = await removePortrait(new NextRequest(`http://localhost/api/admin/cases/${caseId}/portrait`, {
+      method: "DELETE",
+      body: JSON.stringify({ reason: "Retiro solicitado y revisado" })
+    }), { params: Promise.resolve({ caseId }) });
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("remove_public_case_portrait", {
+      p_case_id: caseId,
+      p_reason: "Retiro solicitado y revisado"
+    });
+    expect(remove).toHaveBeenCalledWith([oldPath]);
+  });
+
+  it("impide al público subir una foto y no toca Storage", async () => {
+    getStaffContext.mockResolvedValue({ db: { rpc }, staff: null, authenticated: false });
+    const form = new FormData();
+    form.set("file", new File(["no-es-imagen"], "persona.jpg", { type: "image/jpeg" }));
+    form.set("reason", "Intento público");
+    const response = await uploadPortrait(new NextRequest(`http://localhost/api/admin/cases/${caseId}/portrait`, { method: "POST", body: form }), {
+      params: Promise.resolve({ caseId })
+    });
+    expect(response.status).toBe(403);
+    expect(adminSupabase).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 

@@ -76,7 +76,7 @@ test("el reporte público simplificado conserva foto opcional y tres pasos", asy
   await expect(page.getByText("Paso 1 de 3")).toBeVisible();
   await expect(page.getByText("Subir foto")).toBeVisible();
   await expect(page.getByText("Tomar foto")).toBeVisible();
-  await expect(page.getByText(/Si no tienes foto, puedes continuar/)).toBeVisible();
+  await expect(page.getByText(/Si no tienes una compatible, puedes continuar sin foto/)).toBeVisible();
   await expect(page.getByLabel(/Descripción para identificarla/)).toBeVisible();
   await expect(page.getByText(/Alias o nombre por el que/i)).toHaveCount(0);
   await expect(page.getByText(/¿Es menor de edad?/i)).toHaveCount(0);

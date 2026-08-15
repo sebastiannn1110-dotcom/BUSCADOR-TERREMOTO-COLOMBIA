@@ -1933,8 +1933,8 @@ begin
   end if;
 
   v_result := public.reports_debug_snapshot();
-  if v_result ->> 'schemaVersion' <> '202608130004'
-    or v_result ->> 'lastMigrationApplied' <> '202608130004'
+  if v_result ->> 'schemaVersion' <> '202608150001'
+    or v_result ->> 'lastMigrationApplied' <> '202608150001'
     or coalesce((v_result ->> 'deceasedFilterReady')::boolean, false) is not true
     or (v_result #>> '{publishedCounts,missing}')::bigint <> (
       select count(*)
@@ -1962,6 +1962,10 @@ begin
       'name', 'official_deceased_import_entries', 'found', true,
       'rlsEnabled', true, 'rlsForced', true
     )))
+    or not (v_result -> 'tables' @> jsonb_build_array(jsonb_build_object(
+      'name', 'person_import_entries', 'found', true,
+      'rlsEnabled', true, 'rlsForced', true
+    )))
     or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
       'name', 'review_pending_person_case', 'found', true
     )))
@@ -1982,6 +1986,12 @@ begin
     )))
     or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
       'name', 'apply_deceased_memorial_portrait', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'preview_missing_people_import', 'found', true
+    )))
+    or not (v_result -> 'rpcs' @> jsonb_build_array(jsonb_build_object(
+      'name', 'set_public_case_portrait', 'found', true
     )))
     or not (v_result -> 'buckets' @> jsonb_build_array(jsonb_build_object(
       'name', 'report-evidence'

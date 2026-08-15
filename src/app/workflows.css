@@ -54,6 +54,10 @@
 .import-preview table { background: #fff; border-collapse: collapse; width: 100%; }
 .import-preview th, .import-preview td { border: 1px solid var(--line); padding: 10px; text-align: left; }
 .danger-button { background: var(--danger); }
+.portrait-admin { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+.portrait-admin h3 { margin: 0 0 10px; }
+.admin-portrait-preview { background: #e5eeee; border-radius: 8px; height: 180px; margin-bottom: 12px; overflow: hidden; width: 180px; }
+.admin-portrait-preview img { height: 100%; object-fit: cover; width: 100%; }
 .pagination { display: flex; gap: 12px; justify-content: center; margin-top: 28px; }
 .page-indicator { color: var(--muted); font-weight: 700; }
 @media (max-width: 720px) {

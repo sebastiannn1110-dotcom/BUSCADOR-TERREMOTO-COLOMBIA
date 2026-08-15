@@ -40,6 +40,8 @@ describe("revisión administrativa segura", () => {
     expect(screen.getByLabelText("Razón obligatoria del retiro")).toBeRequired();
     expect(screen.getByLabelText(/Confirmo que esta persona/)).toBeRequired();
     expect(screen.getByRole("button", { name: "Retirar del buscador" })).toBeInTheDocument();
+    expect(screen.getByText("Foto no disponible")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Subir foto" })).toBeInTheDocument();
   });
 
   it("muestra mensajes web y el historial interno agrupados por caso", async () => {

@@ -48,7 +48,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
         {deceased
           ? <div><dt>Unidad básica / lugar reportado</dt><dd>{item.reported_unit || item.last_seen_location_public || "No informado"}</dd></div>
           : <>
-            <div><dt>Último lugar público conocido</dt><dd>{item.last_seen_location_public || "No informado"}</dd></div>
+            <div><dt>Lugar reportado</dt><dd>{item.last_seen_location_public || "No especificado"}</dd></div>
             <div><dt>Fecha y hora</dt><dd>{formatDate(item.last_seen_at)}</dd></div>
             <div><dt>Posibles avistamientos revisados</dt><dd>{sightingCount}</dd></div>
             {item.latest_approved_sighting_location

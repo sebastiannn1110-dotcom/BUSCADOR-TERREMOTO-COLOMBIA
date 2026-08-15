@@ -8,6 +8,31 @@ vi.mock("@/lib/cases", () => ({ getCase }));
 import PersonPage from "@/app/persona/[slug]/page";
 
 describe("página pública del caso", () => {
+  it("muestra el retrato público actual en la ficha", async () => {
+    getCase.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      slug: "persona-con-retrato",
+      full_name: "Persona con retrato",
+      approximate_age: null,
+      is_minor: false,
+      condition_status: "missing",
+      verification_level: "moderator_reviewed",
+      urgency_level: "normal",
+      last_seen_at: null,
+      last_seen_location_public: null,
+      primary_public_photo_url: "data:image/jpeg;base64,/9j/2Q==",
+      approved_reports_count: 0,
+      approved_sightings: [],
+      updated_at: "2026-08-15T12:00:00Z",
+      is_test_data: false
+    });
+    const page = await PersonPage({ params: Promise.resolve({ slug: "persona-con-retrato" }) });
+    const html = renderToStaticMarkup(page);
+    expect(html).toContain("Foto publicada de Persona con retrato");
+    expect(html).toContain("<img");
+    expect(html).not.toContain("Foto no disponible");
+  });
+
   it("muestra solo el avistamiento revisado sin datos privados", async () => {
     const item = {
       id: "11111111-1111-4111-8111-111111111111",

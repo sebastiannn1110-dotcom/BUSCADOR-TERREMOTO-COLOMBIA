@@ -13,6 +13,7 @@ El esquema separa identidad, caso, reportes y contacto para que la proyección p
 | `media_assets` | Metadatos y rutas de evidencia/retratos. | Solo URL de retrato aprobada a través de la vista. |
 | `contact_followups` | Historial privado de gestiones con contactos. | Nunca. |
 | `official_deceased_import_entries` | Bitácora privada de idempotencia por referencia y fila de la fuente oficial. | Nunca. |
+| `person_import_entries` | Ledger privado e idempotente para importaciones de desaparecidos, con RLS habilitado y forzado. | Nunca. |
 | `moderation_actions` | Acciones y razones administrativas. | Nunca. |
 | `status_history` | Transiciones de condición/verificación. | Nunca. |
 | `audit_logs` | Accesos y operaciones sensibles. | Nunca. |
@@ -43,4 +44,4 @@ Los checks impiden `deceased_confirmed` sin `authority_confirmed`, razón y refe
 
 ## Migraciones
 
-La versión esperada es `202608130004` y requiere ocho archivos, en orden. La migración más reciente añade un vínculo conmemorativo auditado por caso fallecido y hace que la proyección pública lo prefiera sin modificar estados ni referencias de autoridad. El diagnóstico valida `supabase_migrations.schema_migrations`, RLS, grants, RPCs, conteos agregados y buckets.
+La versión esperada es `202608150001` y requiere nueve archivos, en orden. La migración más reciente añade retratos individuales auditados, importación idempotente de desaparecidos y soporte XLSX en servidor, sin ampliar el contrato público ni modificar estados desde acciones públicas. El diagnóstico valida `supabase_migrations.schema_migrations`, RLS, grants, RPCs, conteos agregados y buckets.

@@ -72,6 +72,18 @@ describe("flujos públicos", () => {
     expect(html).not.toContain("<img");
   });
 
+  it("usa el retrato público actual en cards de inicio, búsqueda y fallecidos", async () => {
+    const withPortrait = { ...item, primary_public_photo_url: "data:image/jpeg;base64,/9j/2Q==" };
+    const cardHtml = renderToStaticMarkup(<CaseCard item={withPortrait} />);
+    expect(cardHtml).toContain("Foto publicada de Persona de prueba");
+    expect(cardHtml).toContain("<img");
+
+    searchCases.mockResolvedValue([withPortrait]);
+    expect(renderToStaticMarkup(await Home())).toContain("Foto publicada de Persona de prueba");
+    expect(renderToStaticMarkup(await DeceasedPage({ searchParams: Promise.resolve({}) })))
+      .toContain("Foto publicada de Persona de prueba");
+  });
+
   it("filtra fallecidos por confirmación oficial antes de renderizar", async () => {
     searchCases.mockResolvedValue([
       item,

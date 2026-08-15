@@ -5,7 +5,7 @@
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-export const EXPECTED_SCHEMA_VERSION = "202608130004";
+export const EXPECTED_SCHEMA_VERSION = "202608150001";
 
 export const requiredEnvironment = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -36,6 +36,7 @@ export const expectedTables = [
   "moderation_actions",
   "contact_followups",
   "official_deceased_import_entries",
+  "person_import_entries",
   "submission_rate_limits",
   "public_case_cards"
 ];
@@ -56,6 +57,11 @@ export const expectedServiceRoleVisibleRpcs = [
   "get_staff_media_asset",
   "preview_official_deceased_import",
   "import_official_deceased",
+  "preview_missing_people_import",
+  "import_missing_people",
+  "set_public_case_portrait",
+  "remove_public_case_portrait",
+  "import_official_deceased_v2",
   "bootstrap_initial_admin",
   "apply_deceased_memorial_portrait",
   "reports_debug_snapshot"
@@ -63,13 +69,18 @@ export const expectedServiceRoleVisibleRpcs = [
 
 // These functions are checked through the service-only diagnostics snapshot,
 // not by assuming service_role can execute the authenticated-admin function.
-const expectedSnapshotRpcs = [
+export const expectedSnapshotRpcs = [
   "bootstrap_initial_admin",
   "manage_staff_profile",
   "get_admin_people_cases",
   "withdraw_person_case",
   "get_admin_case_message_threads",
-  "apply_deceased_memorial_portrait"
+  "apply_deceased_memorial_portrait",
+  "preview_missing_people_import",
+  "import_missing_people",
+  "set_public_case_portrait",
+  "remove_public_case_portrait",
+  "import_official_deceased_v2"
 ];
 
 // reports_debug_snapshot exposes RLS metadata for these physical tables. The
@@ -84,11 +95,12 @@ export const expectedRlsTables = [
   "moderation_actions",
   "contact_followups",
   "official_deceased_import_entries",
+  "person_import_entries",
   "status_history",
   "audit_logs"
 ];
 
-export const expectedForcedRlsTables = ["official_deceased_import_entries"];
+export const expectedForcedRlsTables = ["official_deceased_import_entries", "person_import_entries"];
 
 export const expectedBucketContracts = {
   "public-portraits": {
@@ -108,6 +120,8 @@ export const expectedColumns = {
   reporter_contacts: ["id", "report_id", "reporter_name", "phone", "email", "preferred_contact_method"],
   contact_followups: ["id", "case_id", "report_id", "contact_id", "target_type", "contact_method", "contact_status", "summary_private", "next_followup_at", "created_by", "created_at"],
   official_deceased_import_entries: ["id", "case_id", "source_reference", "source_row", "payload_fingerprint", "imported_by", "created_at"],
+  person_import_entries: ["id", "case_id", "import_type", "source_name", "source_reference", "source_row", "normalized_name", "payload_fingerprint", "department_disappearance", "municipality_disappearance", "verification_level", "imported_by", "created_at"],
+  media_assets: ["id", "case_id", "asset_type", "storage_bucket", "private_path", "public_path", "detected_mime_type", "size_bytes", "moderation_status", "content_sha256", "retired_at"],
   submission_rate_limits: ["request_fingerprint", "window_started_at", "submission_count", "updated_at"]
 };
 

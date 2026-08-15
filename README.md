@@ -12,7 +12,7 @@ No mezcles personas ficticias con producción. Los datos de prueba solo pueden s
 
 1. Instala Node.js 20.9 o superior y ejecuta `npm install`.
 2. Copia `.env.example` a `.env.local` y completa las variables necesarias.
-3. Aplica en Supabase, en orden, las ocho migraciones:
+3. Aplica en Supabase, en orden, las nueve migraciones:
 
    - `supabase/migrations/202608120001_initial.sql`
    - `supabase/migrations/202608120002_harden_public_report_submission.sql`
@@ -22,6 +22,7 @@ No mezcles personas ficticias con producción. Los datos de prueba solo pueden s
    - `supabase/migrations/202608130002_official_deceased_capture_and_diagnostics.sql`
    - `supabase/migrations/202608130003_admin_case_withdrawal_and_message_threads.sql`
    - `supabase/migrations/202608130004_deceased_memorial_portrait.sql`
+   - `supabase/migrations/202608150001_admin_portraits_and_person_imports.sql`
 
 4. Verifica los buckets `report-evidence` —privado— y `public-portraits` —público y reservado a retratos aprobados—.
 5. Ejecuta `npm run dev`.
@@ -39,6 +40,7 @@ Las migraciones más recientes añaden el flujo de personas pendientes, seguimie
 - Revisar personas pendientes, gestionar cards publicadas y abrir la bandeja privada de mensajes por caso: `/admin/personas-pendientes`.
 - Moderar información: `/admin/avistamientos` (`/admin/posibles-avistamientos` es un alias).
 - Registrar seguimiento privado: `/admin/seguimiento-contactos`.
+- Importar desaparecidos o fallecidos en CSV/Excel: `/admin/importar-personas`, solo `admin`.
 - Importar fallecidos de Medicina Legal: `/admin/importar-fallecidos`, solo `admin`.
 
 Consulta [docs/routes.md](docs/routes.md), [docs/privacy-and-safety.md](docs/privacy-and-safety.md) y [docs/PROJECT_CONTEXT_COMPLETE.md](docs/PROJECT_CONTEXT_COMPLETE.md).
@@ -57,29 +59,37 @@ El primer `admin` se crea una sola vez con el RPC `bootstrap_initial_admin`, res
 
 Ninguna acción pública cambia el estado de un caso. `deceased_confirmed` es exclusivamente administrativo, exige confirmación de autoridad, justificación y referencia privada, y queda auditado.
 
-## Importación oficial
+## Fotos e importación administrativa
 
-Hay dos entradas deliberadamente separadas:
+En `/admin/personas-pendientes?seccion=personas`, `admin` y `moderator` pueden subir, cambiar o quitar el retrato de una persona desaparecida o fallecida. El servidor acepta JPG/PNG/WebP hasta 8 MB, valida el contenido, rota, limita el lado mayor a 1200 px y recodifica a JPEG sin conservar EXIF. Actualiza `cases.primary_public_photo_path`, crea el `media_assets` aprobado y escribe `moderation_actions` y `audit_logs`. La misma proyección segura alimenta home, `/buscar`, `/fallecidos` y `/persona/[slug]`; sin retrato actual muestra `Foto no disponible`.
 
-- El importador administrativo web conserva el formato legado de siete columnas:
+`/admin/importar-personas` acepta `.csv`, `.xlsx` o tabla pegada. Para desaparecidos usa:
 
 ```text
-full_name,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
+source_row,full_name,department_disappearance,municipality_disappearance,source_name,source_reference,public_description
 ```
 
-- La captura controlada entregada para el comunicado usa exclusivamente `data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`, con 142 filas de origen consecutivas, 1–142, y diez columnas:
+Los lugares, edad, sexo y foto nunca se infieren. Una lista `moderator_reviewed` queda en `pending_review`; `authority_confirmed` exige fuente, referencia y confirmación expresa. `person_import_entries` conserva una huella privada para reintentos idempotentes; homónimos y cambios de payload se bloquean.
+
+Para fallecidos, el importador acepta CSV/Excel con:
 
 ```text
 source_row,reported_unit,full_name,gender,approximate_age,source_name,source_reference,public_description,last_seen_location_public,date_confirmed
 ```
 
-`gender` se conserva como dato de la transcripción, pero no se envía al RPC ni se publica. El CLI realiza preview antes de importar, bloquea revisiones ambiguas y usa la clave compuesta privada `source_reference + source_row` para reintentos idempotentes. Requiere `CONFIRM_OFFICIAL_IMPORT=MEDICINA_LEGAL`, `SUPABASE_ADMIN_ACCESS_TOKEN` y `OFFICIAL_IMPORT_REASON`; no debe ejecutarse contra producción sin autorización operativa expresa.
+`full_name`, `source_name=Medicina Legal` y `source_reference` son obligatorios; edad, género, unidad, lugar y fecha pueden quedar vacíos. La referencia no se publica. El CLI oficial mantiene preview, bloqueo de coincidencias e idempotencia por fuente/fila:
 
 ```bash
 npm run import:official-deceased -- data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv
 ```
 
-Consulta [docs/importar-fallecidos-medicina-legal.md](docs/importar-fallecidos-medicina-legal.md) antes de preparar o ejecutar cualquiera de los dos flujos.
+La lista administrativa de desaparecidos se ejecuta únicamente con confirmación y razón explícitas; crea casos pendientes, no publicados:
+
+```bash
+CONFIRM_MISSING_IMPORT=DESAPARECIDOS MISSING_IMPORT_REASON="<razón operativa>" npm run import:missing -- data/imports/desaparecidos-lista-admin-2026-08-15.csv
+```
+
+Consulta [docs/importar-fallecidos-medicina-legal.md](docs/importar-fallecidos-medicina-legal.md) y [docs/importar-desaparecidos.md](docs/importar-desaparecidos.md).
 
 ## Variables de producción
 
@@ -91,6 +101,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 APP_URL=https://buscador-terremoto-colombia.onrender.com
 ENABLE_TEST_DATA=false
+NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=<token público del sitio>
 CAPTCHA_PROVIDER=turnstile
 NEXT_PUBLIC_CAPTCHA_SITE_KEY=...
 CAPTCHA_SECRET_KEY=...
@@ -99,11 +110,13 @@ IP_HASH_SECRET=<secreto largo y aleatorio>
 
 `OPENAI_API_KEY` y `OPENAI_MODEL` son opcionales. `DEBUG_REPORTS_TOKEN` debe ser aleatorio, tener al menos 32 caracteres, habilita un endpoint temporal de diagnóstico y debe retirarse después de la investigación. El endpoint solo expone metadatos de esquema, RLS, migraciones, buckets, conteos públicos agregados y estados `FOUND`/`MISSING`, nunca valores secretos ni filas privadas. `/api/health` informa además `databaseReachable`, `schemaVersion`, `deceasedRouteAvailable` y `appUrlConfiguredCorrectly`.
 
+`NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` es opcional. Si falta, no se renderiza analytics y el build continúa. Si existe, el beacon se limita a `/`, `/fallecidos` sin parámetros y `/privacidad`, con seguimiento SPA desactivado. No se mide `/buscar`, fichas con slug, confirmaciones, formularios ni administración. No hay Google Analytics ni eventos personalizados. Consulta [docs/analytics.md](docs/analytics.md).
+
 Las tres variables CAPTCHA se configuran juntas únicamente si Turnstile está habilitado. Con una `.env` operativa autorizada, `npm run inspect:production` ejecuta una inspección de solo lectura del contrato de producción y devuelve estado agregado, sin imprimir secretos ni filas.
 
 ## Datos ficticios: solo demo
 
-Con las ocho migraciones aplicadas en un proyecto separado de demo y `ENABLE_TEST_DATA=true`:
+Con las nueve migraciones aplicadas en un proyecto separado de demo y `ENABLE_TEST_DATA=true`:
 
 - Ejecuta `supabase/seed.sql` después de `set app.enable_test_data = 'true';`, o
 - define `DEMO_SEED_CONFIRMATION=seed-15-fictional-cases` y ejecuta `npm run seed:demo`.
@@ -122,6 +135,6 @@ npm run test:e2e
 
 ## Render
 
-Usa un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Aplica y verifica las ocho migraciones antes del despliegue; luego valida `/api/health`, `/api/debug/reports`, los RPC, ambos buckets y los flujos con roles reales. Aplicar una migración, desplegar un commit e importar datos son acciones independientes. No cargues datos ficticios en producción.
+Usa un Web Service Node con `npm ci && npm run build` como build command y `npm run start` como start command. Aplica y verifica las nueve migraciones antes del despliegue; luego valida `/api/health`, `/api/debug/reports`, los RPC, ambos buckets y los flujos con roles reales. Aplicar una migración, desplegar un commit e importar datos son acciones independientes. No cargues datos ficticios en producción.
 
 Consulta [docs/render-deployment.md](docs/render-deployment.md) para el procedimiento exacto.

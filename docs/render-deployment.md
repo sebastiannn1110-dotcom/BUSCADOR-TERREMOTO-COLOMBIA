@@ -4,7 +4,7 @@ Este documento describe el procedimiento. No afirma que la migración, el commit
 
 ## 1. Preparar Supabase
 
-Revisa y aplica, en este orden, las ocho migraciones:
+Revisa y aplica, en este orden, las nueve migraciones:
 
 1. `202608120001_initial.sql`
 2. `202608120002_harden_public_report_submission.sql`
@@ -14,12 +14,13 @@ Revisa y aplica, en este orden, las ocho migraciones:
 6. `202608130002_official_deceased_capture_and_diagnostics.sql`
 7. `202608130003_admin_case_withdrawal_and_message_threads.sql`
 8. `202608130004_deceased_memorial_portrait.sql`
+9. `202608150001_admin_portraits_and_person_imports.sql`
 
-En un checkout limpio, autentica y vincula primero el CLI al proyecto correcto con `supabase login` y `supabase link --project-ref <PROJECT_REF>`. Después revisa las migraciones pendientes y usa `supabase db push`. Aplicarlas manualmente en SQL Editor no basta para este procedimiento porque puede dejar `supabase_migrations.schema_migrations` sin la versión que verifica el diagnóstico. La versión esperada por el código es `202608130004`.
+En un checkout limpio, autentica y vincula primero el CLI al proyecto correcto con `supabase login` y `supabase link --project-ref <PROJECT_REF>`. Después revisa las migraciones pendientes y usa `supabase db push`. Aplicarlas manualmente en SQL Editor no basta para este procedimiento porque puede dejar `supabase_migrations.schema_migrations` sin la versión que verifica el diagnóstico. La versión esperada por el código es `202608150001`.
 
 Comprueba después:
 
-- tablas y RLS, incluidas `contact_followups` y la bitácora privada `official_deceased_import_entries`;
+- tablas y RLS, incluidas `contact_followups`, `official_deceased_import_entries` y el ledger privado con RLS forzado `person_import_entries`;
 - la columna pública segura `cases.reported_unit` y su proyección como `reported_unit`;
 - RPCs públicos y administrativos;
 - `report-evidence`: privado, máximo 8 MB, JPG/PNG/WebP;
@@ -51,6 +52,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 APP_URL=https://buscador-terremoto-colombia.onrender.com
 IP_HASH_SECRET=<secreto largo, aleatorio e independiente>
 ENABLE_TEST_DATA=false
+NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=<token público opcional>
 ```
 
 Obligatorias si Turnstile está habilitado:
@@ -80,8 +82,8 @@ Las credenciales del CLI de importación no deben quedar persistidas en Render. 
 
 1. Ejecutar `npm ci`, lint, typecheck, tests, build y E2E; revisar y crear el commit candidato.
 2. Corregir en Render `APP_URL=https://buscador-terremoto-colombia.onrender.com` y mantener `ENABLE_TEST_DATA=false`.
-3. Ejecutar `supabase login`, vincular el proyecto correcto, revisar y aplicar las ocho migraciones con `supabase db push`.
-4. Verificar esquema `202608130004`, RLS, grants, ambos buckets, conteos agregados y `deceasedFilterReady: true`.
+3. Ejecutar `supabase login`, vincular el proyecto correcto, revisar y aplicar las nueve migraciones con `supabase db push`.
+4. Verificar esquema `202608150001`, RLS, grants, ambos buckets, conteos agregados y `deceasedFilterReady: true`.
 5. Solo con autorización operativa explícita, ejecutar el CLI controlado descrito en la sección 5 y conservar el resumen agregado como evidencia.
 6. Ejecutar `git push origin main` con el commit aprobado.
 7. Iniciar Manual Deploy en Render y confirmar que el hash desplegado coincide con `main`.
@@ -89,18 +91,20 @@ Las credenciales del CLI de importación no deben quedar persistidas en Render. 
 
 ## 4. Smoke tests de producción
 
-- `GET /api/health` muestra `databaseReachable: true`, `schemaVersion: "202608130004"`, `deceasedRouteAvailable: true` y `appUrlConfiguredCorrectly: true`, sin secretos.
+- `GET /api/health` muestra `databaseReachable: true`, `schemaVersion: "202608150001"`, `deceasedRouteAvailable: true` y `appUrlConfiguredCorrectly: true`, sin secretos.
 - `/api/debug/reports`, con token temporal, muestra la última migración, los conteos agregados `missing`/`deceasedConfirmed`, `deceasedFilterReady: true`, tablas/RLS/RPCs y ambos buckets.
 - Inicio y `/buscar` cargan únicamente casos publicados; los filtros visibles de búsqueda son `Todos`, `Desaparecidos` y `Fallecidos confirmados`.
 - `/fallecidos` carga únicamente `published` + `deceased_confirmed` + `authority_confirmed`; muestra `public_source_label` y etiqueta la unidad como `Unidad básica / lugar reportado`, nunca como lugar de muerte.
 - Reporte nuevo sin foto y con foto recibe del API solo `{ "received": true }` y navega a `/reporte/confirmacion`. La confirmación no muestra tracking, URL ni botón de copia, ofrece solo volver al inicio o reportar otra persona y responde con `noindex, nofollow`. Una URL heredada con tracking redirige a la ruta genérica para quitarlo también de la barra de direcciones.
 - `/admin/personas-pendientes` permite publicar con ubicación pública redactada.
 - `/admin/personas-pendientes?seccion=personas` permite al admin retirar una card con razón y auditoría, sin borrado físico.
+- `/admin/personas-pendientes?seccion=personas` permite a admin/moderador subir, cambiar y quitar retratos públicos; la card refleja el resultado sin promover evidencia privada automáticamente.
 - `/admin/personas-pendientes?seccion=mensajes` agrupa mensajes entrantes e historial privado por caso.
 - Aprobar un retrato genera un JPEG público sin exponer el objeto privado.
 - `/admin/avistamientos` publica únicamente sightings aprobados y no cambia el estado del caso.
 - `/admin/seguimiento-contactos` registra una fila append-only y auditoría.
 - Importador de Medicina Legal bloquea referencia vacía y coincidencia ambigua, exige preview y confirmación.
+- `/admin/importar-personas` acepta CSV/XLSX o tabla pegada, bloquea homónimos y deja una lista no oficial de desaparecidos en `pending_review`.
 - `responder` tiene lectura pero no controles de escritura.
 - Todas las respuestas administrativas sensibles usan `no-store`.
 
@@ -112,7 +116,7 @@ El archivo versionado es `data/imports/medicina-legal-fallecidos-captura-2026-08
 
 Antes de ejecutarlo:
 
-1. confirma `schemaVersion = 202608130004`;
+1. confirma `schemaVersion = 202608150001`;
 2. obtiene una sesión vigente de un perfil `admin` y úsala como `SUPABASE_ADMIN_ACCESS_TOKEN`;
 3. define una razón operacional de 10–1000 caracteres en `OFFICIAL_IMPORT_REASON`;
 4. establece `CONFIRM_OFFICIAL_IMPORT=MEDICINA_LEGAL` solo después de recibir autorización expresa;
@@ -144,7 +148,7 @@ Después, elimina las variables transitorias, revisa `/fallecidos`, el conteo ag
 Este es el orden operativo explícito; la presencia de estas instrucciones no significa que ya se haya ejecutado:
 
 1. Corregir en Render `APP_URL=https://buscador-terremoto-colombia.onrender.com` y mantener `ENABLE_TEST_DATA=false`.
-2. Desde un entorno autenticado contra el proyecto Supabase correcto, revisar el diff y ejecutar `supabase db push`; comprobar `schemaVersion = 202608130004` antes de continuar.
+2. Desde un entorno autenticado contra el proyecto Supabase correcto, revisar el diff y ejecutar `supabase db push`; comprobar `schemaVersion = 202608150001` antes de continuar.
 3. Solo si existe autorización formal, preparar las variables efímeras y ejecutar `npm run import:official-deceased -- data/imports/medicina-legal-fallecidos-captura-2026-08-13.csv`.
 4. Ejecutar `git push origin main` con el commit ya validado.
 5. En Render, iniciar **Manual Deploy** del hash exacto de `main` y esperar que termine correctamente.

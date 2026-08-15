@@ -12,6 +12,7 @@ type InspectorModule = {
   expectedTables: string[];
   expectedColumns: Record<string, string[]>;
   expectedServiceRoleVisibleRpcs: string[];
+  expectedSnapshotRpcs: string[];
   expectedRlsTables: string[];
   expectedForcedRlsTables: string[];
   expectedBucketContracts: Record<string, { public: boolean; allowedMimeTypes: string[] }>;
@@ -60,14 +61,7 @@ describe("inspector seguro del contrato de producción", () => {
         })),
         { name: "public_case_cards", found: true, kind: "view", rlsEnabled: null, rlsForced: null },
       ],
-      rpcs: [
-        { name: "bootstrap_initial_admin", found: true },
-        { name: "manage_staff_profile", found: true },
-        { name: "get_admin_people_cases", found: true },
-        { name: "withdraw_person_case", found: true },
-        { name: "get_admin_case_message_threads", found: true },
-        { name: "apply_deceased_memorial_portrait", found: true },
-      ],
+      rpcs: inspector.expectedSnapshotRpcs.map((name) => ({ name, found: true })),
       buckets: Object.entries(inspector.expectedBucketContracts).map(([name, contract]) => ({
         name,
         found: true,
@@ -98,7 +92,7 @@ describe("inspector seguro del contrato de producción", () => {
     };
   }
 
-  it("valida la migración 006, conteos, filtro deceased, RLS y Storage", () => {
+  it("valida la migración actual, conteos, filtro deceased, RLS y Storage", () => {
     const result = inspector.evaluateProductionContract(validFixture());
     expect(result).toEqual({ status: "OK", failures: [] });
   });
