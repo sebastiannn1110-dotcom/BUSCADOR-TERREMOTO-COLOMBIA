@@ -2,6 +2,8 @@
 -- Public clients continue to read only the allow-listed public_case_cards view
 -- through get_public_case/search_public_people.
 
+create extension if not exists pgcrypto with schema extensions;
+
 alter table public.media_assets
   add column if not exists moderation_status public.moderation_status,
   add column if not exists content_sha256 text,
@@ -103,7 +105,7 @@ language sql
 immutable
 set search_path = pg_catalog, public, pg_temp
 as $$
-  select encode(digest(convert_to(concat_ws(E'\x1f',
+  select encode(extensions.digest(convert_to(concat_ws(E'\x1f',
     public.normalize_person_name(p_name),
     lower(btrim(coalesce(p_department, ''))),
     lower(btrim(coalesce(p_municipality, ''))),
