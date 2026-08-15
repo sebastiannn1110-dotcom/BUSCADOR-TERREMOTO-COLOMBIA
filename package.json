@@ -19,6 +19,7 @@
     "staff:manage": "tsx scripts/promote-admin.ts manage",
     "import:official-deceased": "tsx scripts/import-official-deceased-from-csv.ts",
     "import:missing": "tsx scripts/import-missing.ts",
+    "scrape:colombia-te-busca:images": "tsx scripts/scrape-colombia-te-busca-images.ts",
     "inspect:production": "node --env-file=.env scripts/inspect-reports-production.mjs",
     "memorial:prepare": "tsx scripts/apply-deceased-memorial-image.ts prepare",
     "memorial:apply": "node --env-file=.env --import tsx scripts/apply-deceased-memorial-image.ts apply",
